@@ -12,6 +12,20 @@ h1 { font-size: clamp(2.6rem, 8vw, 5.8rem); line-height: .96; letter-spacing: -.
 .primary { background: #6d5dfc; color: white; border: 0; border-radius: 12px; font-weight: 700; padding: 14px 18px; margin-top: 18px; }
 .primary:disabled { opacity: .6; cursor: wait; }
 .hint { color: #7f879c; font-size: .9rem; margin-top: 18px; }
+.login-link, .brand-link { color: #bfc6ff; text-decoration: none; font-weight: 700; }
+.login-link { float: right; }
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.auth-card { width: min(440px, 100%); background: #101526; border: 1px solid #252f4b; border-radius: 18px; padding: 28px; }
+.auth-card h1 { font-size: 2.3rem; letter-spacing: -.05em; margin: 24px 0 8px; }
+.auth-card p, .muted { color: #aab3c9; }
+form { display: grid; gap: 12px; margin-top: 24px; } label { color: #cbd2e5; display: grid; gap: 7px; font-size: .9rem; font-weight: 700; }
+input { background: #080b14; border: 1px solid #38425d; border-radius: 9px; color: white; font: inherit; padding: 12px; }
+.auth-card .primary { margin-top: 0; }
+.dashboard { min-height: 100vh; } .dashboard-header { align-items: center; border-bottom: 1px solid #242d48; display: grid; gap: 10px; grid-template-columns: auto 1fr auto auto; padding: 14px max(20px, calc((100vw - 1100px) / 2)); }
+.dashboard-header .primary { margin: 0; } .dashboard-content { margin: 0 auto; max-width: 1100px; padding: 64px 24px; } .dashboard-content h1 { font-size: 3rem; margin: 8px 0; }
+.empty { background: #101526; border: 1px dashed #38425d; border-radius: 16px; margin-top: 32px; padding: 36px; } .empty h2 { margin-top: 0; }
+.board-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 32px; }
+.board-card { background: #101526; border: 1px solid #2a3552; border-radius: 14px; color: #f7f8fc; display: grid; gap: 34px; padding: 18px; text-align: left; } .board-card:hover { border-color: #796dff; } .board-card span { color: #929bb3; font-size: .85rem; }
 .room { height: 100vh; display: grid; grid-template-rows: auto 1fr; }
 .topbar { align-items: center; background: #101526; display: flex; gap: 12px; min-height: 58px; padding: 10px 16px; }
 .brand { font-weight: 800; letter-spacing: -.04em; }

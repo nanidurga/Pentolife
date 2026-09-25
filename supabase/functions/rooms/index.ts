@@ -38,11 +38,25 @@ Deno.serve(async (request) => {
     const editorToken = randomToken();
     const viewerToken = randomToken();
     const { data: room, error } = await admin.from("rooms").insert({
-      editor_token_hash: await hash(editorToken), viewer_token_hash: await hash(viewerToken),
+      editor_token_hash: await hash(editorToken),
+      viewer_token_hash: await hash(viewerToken),
+      owner_id: user.is_anonymous ? null : user.id,
     }).select("id").single();
     if (error || !room) return json({ error: "Could not create room." }, 500);
     await admin.from("room_members").insert({ room_id: room.id, user_id: user.id, role: "editor" });
     return json({ roomId: room.id, editorToken, viewerToken });
+  }
+
+  if (body.action === "owner-access") {
+    if (user.is_anonymous || !body.roomId) return json({ error: "Sign in with your personal account first." }, 403);
+    const { data: ownedRoom } = await admin.from("rooms").select("id").eq("id", body.roomId).eq("owner_id", user.id).maybeSingle();
+    if (!ownedRoom) return json({ error: "Board not found." }, 404);
+    const editorToken = randomToken();
+    const viewerToken = randomToken();
+    await admin.from("rooms").update({
+      editor_token_hash: await hash(editorToken), viewer_token_hash: await hash(viewerToken), updated_at: new Date().toISOString(),
+    }).eq("id", body.roomId);
+    return json({ roomId: body.roomId, editorToken, viewerToken });
   }
 
   const { roomId, token } = body;

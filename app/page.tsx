@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { makeCapability } from "@/lib/room";
 import { ensureAnonymousSession } from "@/lib/supabase";
+import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function Home() {
     }
   }
 
-  return <main className="landing"><section className="hero">
+  return <main className="landing"><section className="hero"><Link className="login-link" href="/dashboard">My dashboard →</Link>
     <div className="eyebrow">PentoLive · personal beta</div>
     <h1>Your live interview thinking surface.</h1>
     <p>Write with your tablet, build architecture diagrams, and let an interviewer follow a single private link.</p>
