@@ -25,6 +25,12 @@ export function createSaver(options: {
   let disposed = false;
   let attempt = 0;
   let inFlight: Promise<void> | null = null;
+  let backingOff = false;
+  let lastSucceeded = true;
+
+  const emit = (state: SaveState) => {
+    if (!disposed) options.onState?.(state);
+  };
 
   const clearTimers = () => {
     for (const timer of [idleTimer, maxTimer, retryTimer]) if (timer !== null) clearTimeout(timer);
@@ -38,26 +44,38 @@ export function createSaver(options: {
   };
 
   function trigger(): Promise<void> {
+    if (disposed) return Promise.resolve();
     clearTimers();
-    if (inFlight) return inFlight.then(() => (dirty ? trigger() : undefined));
-    if (!dirty || disposed) return Promise.resolve();
+    if (inFlight) return inFlight.then(() => (lastSucceeded && dirty ? trigger() : undefined));
+    if (!dirty) return Promise.resolve();
     dirty = false;
-    options.onState?.("saving");
-    inFlight = options.save().then(
+    emit("saving");
+    let attemptPromise: Promise<void>;
+    try {
+      attemptPromise = options.save();
+    } catch (error) {
+      attemptPromise = Promise.reject(error);
+    }
+    inFlight = attemptPromise.then(
       () => {
         inFlight = null;
         attempt = 0;
-        if (!dirty) options.onState?.("saved");
+        backingOff = false;
+        lastSucceeded = true;
+        if (!dirty) emit("saved");
       },
       (error: unknown) => {
         inFlight = null;
+        lastSucceeded = false;
+        backingOff = true;
         dirty = true;
+        clearTimers();
         if ((error as { permanent?: boolean } | null)?.permanent) {
           attempt = 0;
-          options.onState?.("failed");
+          emit("failed");
           return;
         }
-        options.onState?.("retrying");
+        emit("retrying");
         const delay = backoff[Math.min(attempt, backoff.length - 1)];
         attempt += 1;
         if (!disposed) retryTimer = setTimeout(() => void trigger(), delay);
@@ -70,6 +88,14 @@ export function createSaver(options: {
     notifyChange() {
       if (disposed) return;
       dirty = true;
+      if (backingOff) {
+        // Changes never shorten backoff. After a permanent failure no retry is pending,
+        // so arm one at the backoff cap in case the board shrinks back under the limit.
+        if (retryTimer === null && !inFlight) {
+          retryTimer = setTimeout(() => void trigger(), backoff[backoff.length - 1]);
+        }
+        return;
+      }
       schedule();
     },
     flushNow: () => trigger(),

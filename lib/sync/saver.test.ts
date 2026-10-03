@@ -87,4 +87,88 @@ describe("createSaver", () => {
     await vi.advanceTimersByTimeAsync(20_000);
     expect(save).not.toHaveBeenCalled();
   });
+
+  describe("backoff and failure handling", () => {
+    it("changes do not shorten backoff", async () => {
+      const save = vi.fn().mockRejectedValue(new Error("net"));
+      const { saver } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow();
+      const counts: number[] = [];
+      for (let t = 500; t <= 5000; t += 500) {
+        await vi.advanceTimersByTimeAsync(500);
+        saver.notifyChange();
+        counts.push(save.mock.calls.length);
+      }
+      expect(counts).toEqual([1, 2, 2, 2, 2, 3, 3, 3, 3, 3]);
+    });
+
+    it("a change during an in-flight failing save does not skip the retry delay", async () => {
+      let fail!: (e: Error) => void;
+      const save = vi.fn().mockImplementationOnce(() => new Promise<void>((_, r) => { fail = r; })).mockResolvedValue(undefined);
+      const { saver } = setup(save);
+      saver.notifyChange();
+      const first = saver.flushNow();
+      saver.notifyChange();
+      const second = saver.flushNow();
+      fail(new Error("net"));
+      await first;
+      await second;
+      await vi.advanceTimersByTimeAsync(999);
+      expect(save).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(save).toHaveBeenCalledTimes(2);
+    });
+
+    it("after a permanent failure a change arms one retry at the backoff cap", async () => {
+      const save = vi.fn().mockRejectedValue(new PermanentSaveError("too large"));
+      const { saver } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow();
+      saver.notifyChange();
+      saver.notifyChange();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(save).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(save).toHaveBeenCalledTimes(2);
+    });
+
+    it("a permanent failure during an in-flight save with a pending change does not re-save", async () => {
+      let fail!: (e: Error) => void;
+      const save = vi.fn().mockImplementationOnce(() => new Promise<void>((_, r) => { fail = r; }));
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      const first = saver.flushNow();
+      saver.notifyChange();
+      fail(new PermanentSaveError("too large"));
+      await first;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(states.at(-1)).toBe("failed");
+    });
+
+    it("treats a synchronous throw from save like a rejection", async () => {
+      const save = vi.fn().mockImplementationOnce(() => { throw new Error("sync"); }).mockResolvedValue(undefined);
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow();
+      expect(states.at(-1)).toBe("retrying");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(states.at(-1)).toBe("saved");
+    });
+
+    it("dispose with a retry pending stops saves and state reports", async () => {
+      const save = vi.fn().mockRejectedValue(new Error("net"));
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow();
+      const stateCount = states.length;
+      saver.dispose();
+      await vi.advanceTimersByTimeAsync(60_000);
+      await saver.flushNow();
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(states).toHaveLength(stateCount);
+    });
+  });
 });
