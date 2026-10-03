@@ -27,7 +27,7 @@ input { background: #080b14; border: 1px solid #38425d; border-radius: 9px; colo
 .board-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 32px; }
 .board-card { background: #101526; border: 1px solid #2a3552; border-radius: 14px; color: #f7f8fc; display: grid; gap: 34px; padding: 18px; text-align: left; } .board-card:hover { border-color: #796dff; } .board-card span { color: #929bb3; font-size: .85rem; }
 .room { height: 100vh; display: grid; grid-template-rows: auto 1fr; }
-.topbar { align-items: center; background: #101526; display: flex; gap: 12px; min-height: 58px; padding: 10px 16px; }
+.topbar { align-items: center; background: #101526; display: flex; flex-wrap: wrap; gap: 12px; min-height: 58px; padding: 10px 16px; }
 .brand { font-weight: 800; letter-spacing: -.04em; }
 .status { color: #8fe6b0; font-size: .85rem; margin-right: auto; }
 .status.offline { color: #f6c76c; }

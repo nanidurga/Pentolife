@@ -13,6 +13,7 @@
     "@excalidraw/excalidraw": "0.18.1",
     "@supabase/supabase-js": "latest",
     "next": "latest",
+    "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest"
   },
@@ -23,7 +24,6 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "qrcode": "^1.5.4",
     "typescript": "latest",
     "vitest": "^5.0.3"
   }

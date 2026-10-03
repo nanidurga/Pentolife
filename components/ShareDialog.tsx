@@ -1,13 +1,14 @@
 "use client";
 
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ShareDialogProps = { editorUrl: string; viewerUrl: string; onClose: () => void };
 
 export default function ShareDialog({ editorUrl, viewerUrl, onClose }: ShareDialogProps) {
   const [qr, setQr] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
+  const linkInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -22,9 +23,18 @@ export default function ShareDialog({ editorUrl, viewerUrl, onClose }: ShareDial
   }, [onClose]);
 
   async function copyViewer() {
-    await navigator.clipboard.writeText(viewerUrl);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(viewerUrl);
+      setCopyStatus("success");
+    } catch {
+      setCopyStatus("error");
+      if (linkInputRef.current) {
+        linkInputRef.current.select();
+      }
+    }
   }
+
+  const buttonLabel = copyStatus === "success" ? "Copied" : copyStatus === "error" ? "Couldn't copy — select the link and copy it" : "Copy viewer link";
 
   return <div className="share-backdrop" onClick={onClose}>
     <section className="share-dialog" role="dialog" aria-modal="true" aria-labelledby="share-title" onClick={(event) => event.stopPropagation()}>
@@ -36,8 +46,8 @@ export default function ShareDialog({ editorUrl, viewerUrl, onClose }: ShareDial
       </div>
       <div className="share-block">
         <strong>Interviewer link (view only)</strong>
-        <input className="share-link" readOnly value={viewerUrl} onFocus={(event) => event.currentTarget.select()} />
-        <button className="primary" onClick={copyViewer}>{copied ? "Copied" : "Copy viewer link"}</button>
+        <input ref={linkInputRef} className="share-link" readOnly value={viewerUrl} onFocus={(event) => event.currentTarget.select()} />
+        <button className="primary" onClick={copyViewer}>{buttonLabel}</button>
       </div>
       <button className="copy share-close" onClick={onClose}>Close</button>
     </section>
