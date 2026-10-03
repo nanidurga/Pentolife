@@ -170,5 +170,25 @@ describe("createSaver", () => {
       expect(save).toHaveBeenCalledTimes(1);
       expect(states).toHaveLength(stateCount);
     });
+
+    it("saves a change made during a successful in-flight retry", async () => {
+      let finish!: () => void;
+      const save = vi.fn()
+        .mockRejectedValueOnce(new Error("net"))
+        .mockImplementationOnce(() => new Promise<void>((r) => { finish = r; }))
+        .mockResolvedValue(undefined);
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(save).toHaveBeenCalledTimes(2);
+      saver.notifyChange();
+      finish();
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(save).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(save).toHaveBeenCalledTimes(3);
+      expect(states.at(-1)).toBe("saved");
+    });
   });
 });

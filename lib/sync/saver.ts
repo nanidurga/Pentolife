@@ -63,6 +63,7 @@ export function createSaver(options: {
         backingOff = false;
         lastSucceeded = true;
         if (!dirty) emit("saved");
+        else if (!disposed) schedule();
       },
       (error: unknown) => {
         inFlight = null;
