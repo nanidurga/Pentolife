@@ -83,8 +83,9 @@ Product rules that apply to all sub-projects:
 
 **Receiver path** (viewer, and any second editor tab)
 1. Ignore messages where `from === clientId`.
-2. `merged = reconcileElements(localElements, remoteElements, appState)` (Excalidraw built-in, version-based, idempotent, order-insensitive).
+2. `merged = mergeByVersion(localElements, remoteElements, protectedIds)` — a small pure function in `lib/sync/merge.ts` using Excalidraw's own rule (higher `version` wins; on a tie the lower `versionNonce` wins), skipping ids the local user is actively editing, then ordering by fractional `index`. Idempotent and order-insensitive. (Chosen over Excalidraw's `reconcileElements` so the rule is unit-testable in Node without loading the Excalidraw browser bundle.)
 3. `api.updateScene({ elements: merged, captureUpdate: CaptureUpdateAction.NEVER })` so remote changes never enter local undo history.
+4. An editor that applies remote elements marks them as already sent, so a second editor tab never echoes them back.
 
 **Late join**
 1. Viewer calls `join` → receives DB snapshot (≤ ~10 s stale) → renders it.
@@ -97,7 +98,7 @@ Product rules that apply to all sub-projects:
 - Editor edits made while disconnected stay in the local scene and in pending; they flush on reconnect.
 
 **Local backup (editor only)**
-- On each flush, write the scene to `localStorage` under `pentolive:backup:{roomId}` (wrapped in try/catch). On load, if the backup is newer than the DB snapshot (compare `getSceneVersion`), reconcile it in.
+- On each flush, write the scene to `localStorage` under the existing key `pentolive:room:{roomId}` (`localRoomKey`, wrapped in try/catch). On load, merge the backup into the DB snapshot with `mergeByVersion`, so per element the newer version wins.
 
 **Presence**
 - All members `track({ role })` once on the interact channel after subscribe.
@@ -111,7 +112,11 @@ lib/sync/
   chunk.ts       chunkBySize(elements, maxBytes) → elements[][]
   throttle.ts    createFlusher({ intervalMs, flush }) — trailing throttle, timer-injectable
   saver.ts       createSaver({ idleMs, maxWaitMs, save }) — idle debounce + max-wait, timer-injectable
+  merge.ts       mergeByVersion(local, remote, protectedIds) — version-based merge + index ordering
+  pending.ts     createPendingSet() — latest-version-per-id buffer with take/restore
   messages.ts    message type definitions + constants
+lib/rooms/
+  api.ts         joinRoom, saveSnapshot, buildSnapshotRequest, classifyJoinError
 lib/realtime/
   roomChannel.ts wires Supabase channels (room + interact), presence, status → callbacks
 components/
@@ -126,8 +131,9 @@ components/
 
 **Saving policy (`saver.ts`)**
 - Save after **2 s idle** (no changes), and at least every **10 s** during continuous drawing.
-- On `visibilitychange → hidden` and `pagehide`: save immediately using `fetch(..., { keepalive: true })` to the Edge Function URL with the user's access token.
-- Failed saves retry with exponential backoff (1 s, 2 s, 4 s, max 30 s); status shows `Not saved — retrying`. Local backup still protects work.
+- On `visibilitychange → hidden` and `pagehide`: save immediately with `fetch` to the Edge Function URL using the user's access token. `keepalive: true` is set only when the body is under 60 KB, because browsers silently drop keepalive bodies over 64 KB; larger scenes rely on the normal request plus the local backup.
+- Failed saves retry with exponential backoff (1 s, 2 s, 4 s, 8 s, 16 s, 30 s cap); status shows `Not saved — retrying`. Local backup still protects work.
+- An HTTP 413 (board too large) is permanent: no retry; status shows `Too large to save — kept on this device`.
 
 **`snapshot` action payload** becomes `{ scene, events }` where `events` is the list of elements changed since the last successful save (deduplicated by id, latest version).
 
@@ -188,7 +194,7 @@ Notes:
 ### 4.6 Keep-alive cron
 
 - Route `app/api/cron/keepalive/route.ts`: verifies `Authorization: Bearer ${CRON_SECRET}`, calls `supabase.rpc("keepalive")` with the publishable key, returns 200/500.
-- Schedule once daily via `vercel.ts` (`crons: [{ path: "/api/cron/keepalive", schedule: "0 6 * * *" }]`), allowed on the Hobby plan.
+- Schedule once daily via `vercel.json` (`crons: [{ path: "/api/cron/keepalive", schedule: "0 6 * * *" }]`), allowed on the Hobby plan. (`vercel.json` instead of `vercel.ts` avoids adding `@vercel/config` for one cron entry.) Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when the env var is set.
 - New env var: `CRON_SECRET` (Vercel, all environments).
 
 ### 4.7 Share dialog & status bar
@@ -210,7 +216,9 @@ Interviewer pointer, comment pins, templates, question frames UX, convert-to-tex
 - `chunk`: small batch → one chunk; batch over limit → multiple chunks each ≤ limit; oversized single element → its own chunk.
 - `throttle`: multiple schedules within interval → one flush; no flush when empty; trailing flush delivers the latest pending.
 - `saver`: saves after idle; saves at max-wait during continuous changes; `flushNow` saves immediately; retry backoff sequence on failure.
-- Merge behaviour: applying the same remote batch twice yields the same scene; applying an older version after a newer one keeps the newer (using Excalidraw's `reconcileElements`).
+- `merge`: applying the same remote batch twice yields the same scene; an older version after a newer one keeps the newer; version tie resolved by lower `versionNonce`; protected ids untouched; result ordered by fractional `index`.
+- `pending`: latest version per id kept; `restore` does not overwrite a newer pending version.
+- `api`: keepalive only under 60 KB; 413 classified as permanent; 403/404 on join classified as invalid link.
 
 ### Manual acceptance (real devices: Samsung tablet + S Pen, laptop Chrome)
 1. Laptop: sign in, create board, open Share, scan QR with tablet.
