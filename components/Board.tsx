@@ -25,6 +25,7 @@ type Role = "editor" | "viewer";
 type BoardProps = { roomId: string; role: Role; token: string; viewerToken: string; local: boolean };
 // CaptureUpdateAction.NEVER — inlined so this file never imports the Excalidraw runtime during SSR.
 const NEVER = "NEVER" as const;
+const BACKUP_INTERVAL_MS = 1000;
 
 const sceneOf = (api: ExcalidrawImperativeAPI): Scene => ({
   elements: api.getSceneElementsIncludingDeleted() as unknown as SyncElement[],
@@ -79,6 +80,10 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     let connection: RoomConnection | null = null;
     let lastSceneReply = 0;
     const backup = readBackup(roomId);
+    let lastBackup = 0;
+    // Never back up before the stored scene is loaded (also covers strict-mode double mount).
+    let loaded = false;
+    const backupNow = () => { if (!loaded) return; lastBackup = Date.now(); writeBackup(roomId, sceneOf(api)); };
 
     if (local) {
       if (backup) api.updateScene({ elements: backup.elements as never, appState: appStateOf(backup.appState), captureUpdate: NEVER });
@@ -97,7 +102,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
       flush: () => {
         const batch = pendingRef.current.take();
         if (batch.length === 0) return;
-        writeBackup(roomId, sceneOf(api));
+        if (Date.now() - lastBackup >= BACKUP_INTERVAL_MS) backupNow();
         const current = connectionRef.current;
         // Not connected yet: keep the batch; the full-scene send on subscribe covers it.
         if (!current) { pendingRef.current.restore(batch); return; }
@@ -112,7 +117,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
 
     async function persist(keepalive: boolean) {
       const supabase = getSupabase();
-      if (!supabase || !api) return;
+      if (!supabase || !api) throw new Error("Supabase unavailable");
       const events = unsavedRef.current.take();
       try {
         await saveSnapshot(supabase, { roomId, token, scene: sceneOf(api), events, keepalive });
@@ -139,7 +144,15 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     async function start() {
       const supabase = await ensureAnonymousSession().catch(() => null);
       if (cancelled) return;
-      if (!supabase) { setStatus("offline"); setReady(true); return; }
+      if (!supabase) {
+        if (role === "editor" && backup) {
+          api!.updateScene({ elements: backup.elements as never, appState: appStateOf(backup.appState), captureUpdate: NEVER });
+        }
+        loaded = true;
+        setStatus("offline");
+        setReady(true);
+        return;
+      }
       const joined = await joinRoom(supabase, { roomId, token, role });
       if (cancelled) return;
       if (!joined.ok && joined.reason === "invalid") { setLinkError(true); return; }
@@ -153,6 +166,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
         appState: appStateOf((joined.ok ? joined.snapshot?.appState : undefined) ?? backup?.appState),
         captureUpdate: NEVER,
       });
+      loaded = true;
       setReady(true);
       if (!joined.ok) { setStatus("offline"); return; }
 
@@ -178,10 +192,12 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     const onVisibility = () => {
       if (document.visibilityState !== "hidden") return;
       flusher.flushNow();
+      if (role === "editor") backupNow();
       void saver?.flushNow();
     };
     const onPageHide = () => {
       flusher.flushNow();
+      if (role === "editor") backupNow();
       if (role === "editor" && unsavedRef.current.size > 0) void persist(true).catch(() => {});
     };
 
@@ -192,6 +208,9 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
+      flusher.flushNow();
+      if (role === "editor") backupNow();
+      void saver?.flushNow();
       flusher.cancel();
       saver?.dispose();
       connection?.close();
