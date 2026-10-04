@@ -98,7 +98,7 @@ All of tests, type check and build must be green before you call work done.
 
 - `next dev` refuses to start a second instance and points at the running one. Process env vars beat `.env.local`, so a dev server started with `FOO=test` keeps answering with the stale value. Always stop dev servers you started (`netstat -ano | grep LISTENING` for ports 3000 and 3123, then `taskkill //PID <pid> //T //F`).
 - `next-env.d.ts` flips between `.next/types` (after `next build`) and `.next/dev/types` (after `next dev`). Never stage it. `next dev` also re-adds this file's Next.js block, which is committed; keep it.
-- No `main` branch exists. `basic-features` is the GitHub default branch, and PRs target it.
+- `main` is the default branch and should be the Vercel production branch. Do every feature or fix on a branch other than `main`, open a PR into `main`, and merge it there. Older branches (`basic-features`, `frontend`, `reliable-live-room`) are kept. Before reusing one, bring it up to date with `git fetch origin && git merge origin/main`.
 - The Vercel CLI is not installed. Ask the user to set Vercel env vars.
 - Public `auth.signUp` returns the profile trigger's raw Postgres error (`username_reserved`, `... profiles_username_key`), not a generic message. Map new trigger errors in `lib/auth/messages.ts`.
 - Auth email uses Supabase's built-in sender: 2 emails per hour, delivered only to project team members. To test sign-in without sending email, create a pre-confirmed user with the admin API (`POST /auth/v1/admin/users`, `email_confirm: true`), then delete it.

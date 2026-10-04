@@ -30,13 +30,13 @@ Make one todo per step, and run them in order. The commands assume Git Bash at t
    - Skip `npm run lint`: it fails on a known missing config.
    - Report the real output. Re-run this step after any later commit that touches code or SQL.
 3. **Review the whole branch diff.**
-   - Run `git fetch origin`. The base is `origin/basic-features`; there is no `main`.
+   - Run `git fetch origin`. The base is `origin/main`.
    - Run these checks:
 
    | Check | Command / criterion |
    |---|---|
-   | Size | `git diff --stat origin/basic-features...HEAD \| tail -1` |
-   | Secrets | `git diff origin/basic-features...HEAD \| grep -nE "sbp_[A-Za-z0-9]{8,}\|sb_secret_[A-Za-z0-9]\|eyJhbGciOi"` prints nothing. Names such as `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` are fine; literal values are not. |
+   | Size | `git diff --stat origin/main...HEAD \| tail -1` |
+   | Secrets | `git diff origin/main...HEAD \| grep -nE "sbp_[A-Za-z0-9]{8,}\|sb_secret_[A-Za-z0-9]\|eyJhbGciOi"` prints nothing. Names such as `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` are fine; literal values are not. |
    | Invariants | Every item in AGENTS.md "Invariants" still holds. |
    | Requirements | Each requirement maps to code or a test. Take them from the spec in `docs/superpowers/specs/`, With no spec, use the plan or the user's request, and say "no spec" in the PR. |
    | Leftovers | No `console.log`, `TODO`, debug flags, or commented-out code that you added. |
@@ -55,7 +55,7 @@ Make one todo per step, and run them in order. The commands assume Git Bash at t
       - query for each new table, column, policy, function and bucket
       - call new RPCs with the publishable key
       - confirm `supabase functions list` shows a higher function version
-      - **If any check fails:** roll back by deploying the base version of the function (`git checkout origin/basic-features -- supabase/functions/rooms`, deploy, then `git checkout HEAD -- supabase/functions/rooms`), and tell the user.
+      - **If any check fails:** roll back by deploying the base version of the function (`git checkout origin/main -- supabase/functions/rooms`, deploy, then `git checkout HEAD -- supabase/functions/rooms`), and tell the user.
 
    **Who runs these:** if `.claude/settings.local.json` allows a command, run it yourself. Otherwise give the user that exact command, in order.
 
@@ -69,7 +69,7 @@ Make one todo per step, and run them in order. The commands assume Git Bash at t
    - **README:** update it if setup or behaviour changed for humans.
    - **Commit the docs** as a separate `docs:` commit. Never stage `next-env.d.ts`, which flips between dev and build.
 7. **Integrate.**
-   - Use superpowers:finishing-a-development-branch. PRs target `basic-features`.
+   - Use superpowers:finishing-a-development-branch. PRs target `main`.
    - PR body sections:
      - **Summary**
      - **Deployment status:** what is live, how you verified it, and the function version.
