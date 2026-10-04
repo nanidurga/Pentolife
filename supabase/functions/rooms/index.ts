@@ -84,8 +84,17 @@ Deno.serve(async (request) => {
   if (!tokenMatches) return json({ error: "Invalid room capability." }, 403);
 
   if (body.action === "join") {
-    await admin.from("room_members").upsert({ room_id: roomId, user_id: user.id, role: requestedRole });
-    return json({ role: requestedRole, snapshot: room.snapshot });
+    // Never downgrade: a viewer join only inserts when the user has no membership yet;
+    // only a validated editor token may write role "editor".
+    const member = { room_id: roomId, user_id: user.id, role: requestedRole };
+    if (requestedRole === "editor") {
+      await admin.from("room_members").upsert(member, { onConflict: "room_id,user_id" });
+    } else {
+      await admin.from("room_members").upsert(member, { onConflict: "room_id,user_id", ignoreDuplicates: true });
+    }
+    const { data: membership } = await admin.from("room_members").select("role")
+      .eq("room_id", roomId).eq("user_id", user.id).maybeSingle();
+    return json({ role: membership?.role ?? requestedRole, snapshot: room.snapshot });
   }
 
   if (body.action === "snapshot") {
