@@ -128,7 +128,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     }
 
     const saver = role === "editor"
-      ? createSaver({ idleMs: SAVE_IDLE_MS, maxWaitMs: SAVE_MAX_WAIT_MS, onState: setSaveState, save: () => persist(false) })
+      ? createSaver({ idleMs: SAVE_IDLE_MS, maxWaitMs: SAVE_MAX_WAIT_MS, onState: setSaveState, save: (keepalive) => persist(keepalive) })
       : null;
     flusherRef.current = flusher;
     saverRef.current = saver;
@@ -189,16 +189,19 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
       connectionRef.current = connection;
     }
 
+    // Spec 4.3: hidden and pagehide both save with keepalive (when the body is small enough).
+    // On close the browser fires hidden then pagehide; the saver re-sends the full scene on
+    // pagehide if a save is still in flight, so the newest content lands last.
     const onVisibility = () => {
       if (document.visibilityState !== "hidden") return;
       flusher.flushNow();
       if (role === "editor") backupNow();
-      void saver?.flushNow();
+      void saver?.flushNow({ keepalive: true });
     };
     const onPageHide = () => {
       flusher.flushNow();
       if (role === "editor") backupNow();
-      if (role === "editor" && unsavedRef.current.size > 0) void persist(true).catch(() => {});
+      void saver?.flushNow({ keepalive: true });
     };
 
     void start();

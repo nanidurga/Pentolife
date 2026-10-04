@@ -11,14 +11,16 @@ export class PermanentSaveError extends Error {
 
 export const DEFAULT_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
-export type Saver = { notifyChange(): void; flushNow(): Promise<void>; dispose(): void };
+export type FlushOptions = { keepalive?: boolean };
+export type Saver = { notifyChange(): void; flushNow(options?: FlushOptions): Promise<void>; dispose(): void };
 
 type Timer = ReturnType<typeof setTimeout> | null;
 
 export function createSaver(options: {
   idleMs: number;
   maxWaitMs: number;
-  save: () => Promise<void>;
+  // `keepalive` is true only for saves triggered while the page is being hidden or unloaded.
+  save: (keepalive: boolean) => Promise<void>;
   onState?: (state: SaveState) => void;
   backoffMs?: number[];
 }): Saver {
@@ -32,6 +34,7 @@ export function createSaver(options: {
   let inFlight: Promise<void> | null = null;
   let backingOff = false;
   let lastSucceeded = true;
+  let generation = 0;
 
   const emit = (state: SaveState) => {
     if (!disposed) options.onState?.(state);
@@ -48,21 +51,20 @@ export function createSaver(options: {
     if (maxTimer === null) maxTimer = setTimeout(() => void trigger(), options.maxWaitMs);
   };
 
-  function trigger(): Promise<void> {
-    if (disposed) return Promise.resolve();
-    clearTimers();
-    if (inFlight) return inFlight.then(() => (lastSucceeded && dirty ? trigger() : undefined));
-    if (!dirty) return Promise.resolve();
+  // Each save is a full scene, so a newer attempt supersedes an older one; a superseded attempt's outcome is ignored.
+  function run(keepalive: boolean): Promise<void> {
     dirty = false;
     emit("saving");
+    const id = ++generation;
     let attemptPromise: Promise<void>;
     try {
-      attemptPromise = options.save();
+      attemptPromise = options.save(keepalive);
     } catch (error) {
       attemptPromise = Promise.reject(error);
     }
-    inFlight = attemptPromise.then(
+    const tracked: Promise<void> = attemptPromise.then(
       () => {
+        if (id !== generation) return;
         inFlight = null;
         attempt = 0;
         backingOff = false;
@@ -71,6 +73,7 @@ export function createSaver(options: {
         else if (!disposed) schedule();
       },
       (error: unknown) => {
+        if (id !== generation) return;
         inFlight = null;
         lastSucceeded = false;
         backingOff = true;
@@ -88,7 +91,21 @@ export function createSaver(options: {
         if (!disposed) retryTimer = setTimeout(() => void trigger(), delay);
       },
     );
-    return inFlight;
+    inFlight = tracked;
+    return tracked;
+  }
+
+  function trigger(keepalive = false): Promise<void> {
+    if (disposed) return Promise.resolve();
+    clearTimers();
+    if (inFlight) {
+      // Page is going away: do not wait for the in-flight request (it may be aborted);
+      // send the newest full scene now with keepalive so it lands last.
+      if (keepalive) return run(true);
+      return inFlight.then(() => (lastSucceeded && dirty ? trigger() : undefined));
+    }
+    if (!dirty) return Promise.resolve();
+    return run(keepalive);
   }
 
   return {
@@ -105,7 +122,7 @@ export function createSaver(options: {
       }
       schedule();
     },
-    flushNow: () => trigger(),
+    flushNow: (flushOptions) => trigger(flushOptions?.keepalive ?? false),
     dispose() {
       disposed = true;
       clearTimers();

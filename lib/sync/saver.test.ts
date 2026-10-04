@@ -201,4 +201,69 @@ describe("createSaver", () => {
       expect(states.at(-1)).toBe("saved");
     });
   });
+
+  describe("keepalive hint", () => {
+    it("timer-driven saves and plain flushNow pass keepalive=false", async () => {
+      const { saver, save } = setup();
+      saver.notifyChange();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(save).toHaveBeenLastCalledWith(false);
+      saver.notifyChange();
+      await saver.flushNow();
+      expect(save).toHaveBeenLastCalledWith(false);
+    });
+
+    it("flushNow({ keepalive: true }) passes keepalive=true", async () => {
+      const { saver, save } = setup();
+      saver.notifyChange();
+      await saver.flushNow({ keepalive: true });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenLastCalledWith(true);
+    });
+
+    it("a keepalive flush does nothing when clean and idle", async () => {
+      const { saver, save } = setup();
+      await saver.flushNow({ keepalive: true });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("a keepalive flush during an in-flight save sends immediately, even when clean", async () => {
+      let finish!: () => void;
+      const save = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => { finish = r; })).mockResolvedValue(undefined);
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      const first = saver.flushNow();
+      const second = saver.flushNow({ keepalive: true });
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(save).toHaveBeenLastCalledWith(true);
+      await second;
+      finish();
+      await first;
+      expect(states.at(-1)).toBe("saved");
+    });
+
+    it("a superseded save's failure does not schedule a retry", async () => {
+      let fail!: (e: Error) => void;
+      const save = vi.fn().mockImplementationOnce(() => new Promise<void>((_, r) => { fail = r; })).mockResolvedValue(undefined);
+      const { saver, states } = setup(save);
+      saver.notifyChange();
+      const first = saver.flushNow();
+      await saver.flushNow({ keepalive: true });
+      fail(new Error("aborted"));
+      await first;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(states.at(-1)).toBe("saved");
+    });
+
+    it("a failed keepalive save retries with keepalive=false", async () => {
+      const save = vi.fn().mockRejectedValueOnce(new Error("net")).mockResolvedValue(undefined);
+      const { saver } = setup(save);
+      saver.notifyChange();
+      await saver.flushNow({ keepalive: true });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(save).toHaveBeenLastCalledWith(false);
+    });
+  });
 });
