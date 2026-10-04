@@ -20,13 +20,23 @@ Without environment variables, the app is still usable as a single-browser proto
 
    ```bash
    supabase functions deploy rooms
+   supabase functions deploy auth --no-verify-jwt
    ```
 
 5. Copy `.env.example` to `.env.local` and set the Project URL plus the **publishable** key from **Project Settings → API**.
 
-## Personal dashboard sign-in
+## Accounts
 
-The `/login` page uses email magic links. In Supabase **Authentication → URL Configuration**, add your Vercel URL with `/auth/callback` as an allowed redirect URL, for example `https://your-app.vercel.app/auth/callback`. Add `http://localhost:3000/auth/callback` for local testing. The authenticated account that creates a board becomes its owner and sees it in `/dashboard`.
+People create an account at `/signup` with an email, a username they choose, and a password. They confirm by email, then sign in at `/signin` with either their email or their username. Signed in, `/` is their dashboard.
+
+In Supabase:
+- Keep **Authentication → Providers → Email → Confirm email** on, and set the minimum password length to 8.
+- In **Authentication → URL Configuration**, allow these redirect URLs for your Vercel URL and for `http://localhost:3000`:
+  - `/auth/callback` (email confirmation)
+  - `/reset-password` (password reset)
+- Supabase's built-in email sender only delivers to your project's team members, at 2 emails per hour. Before other people sign up, set up custom SMTP in **Authentication → Emails → SMTP Settings**.
+
+The account that creates a board becomes its owner and sees it on its dashboard. Interviewers open shared room links without an account.
 
 The Edge Function uses Supabase-managed `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` internally. Do not put the service-role key in Vercel or in any browser environment variable.
 
