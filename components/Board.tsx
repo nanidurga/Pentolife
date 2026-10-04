@@ -109,11 +109,11 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
         // Not connected yet: keep the batch; the full-scene send on subscribe covers it.
         if (!current) { pendingRef.current.restore(batch); return; }
         markSent(sentRef.current, batch);
+        // On failure keep the batch for the next flush; the full-scene send on resubscribe covers it.
         void current.sendElements("elements", batch).then((ok) => {
           if (ok) return;
           unmarkSent(sentRef.current, batch);
           pendingRef.current.restore(batch);
-          flusher.schedule();
         });
       },
     });
