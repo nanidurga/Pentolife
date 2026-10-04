@@ -28,7 +28,9 @@ All of tests, type check and build must be green before you call work done.
 
 - `app/`: routes.
   - `room/[roomId]` is the board.
-  - `dashboard`, `login` and `auth/callback` handle owner sign-in via magic link.
+  - `/` shows the landing page when signed out and the dashboard when signed in.
+  - `signup`, `signin`, `forgot-password`, `reset-password` and `auth/callback` handle email + password accounts with self-chosen usernames.
+  - `/dashboard` and `/login` redirect to `/` and `/signin` (see `next.config.ts`).
   - `api/cron/keepalive` is pinged daily by Vercel Cron, see `vercel.json`.
 - `components/Board.tsx`: the integration point. It handles:
   - joining with retry
@@ -40,7 +42,12 @@ All of tests, type check and build must be green before you call work done.
 - `lib/rooms/*`: the Edge Function client (`api.ts`) and join retry.
 - `lib/realtime/*`: channels, connection status and presence.
 - `supabase/migrations/*.sql`: run in filename order. Write each new migration so it can be re-run safely (`if not exists`, `create or replace`, `drop policy if exists`).
-- `supabase/functions/rooms/index.ts`: Deno Edge Function with the `create`, `join`, `snapshot` and `owner-access` actions. It is the only code that holds the service-role key.
+- `supabase/functions/rooms/index.ts`: Deno Edge Function with the `create`, `join`, `snapshot` and `owner-access` actions.
+- `supabase/functions/auth/index.ts`: signs in with "email or username" so emails never reach the browser.
+  - Deploy it with `--no-verify-jwt`, because callers are signed out.
+  - It shares `supabase/functions/_shared/username.ts` with the app (via `lib/auth/username.ts`). The reserved-name list there must match `public.is_reserved_username()`.
+- The two Edge Functions are the only code that holds the service-role key.
+- `lib/auth/*`: username and password rules, auth error copy, and the browser auth client.
 - `docs/superpowers/specs` and `docs/superpowers/plans`: design specs and plans. A new feature gets its spec first.
 
 ## Invariants (do not break)
