@@ -8,6 +8,7 @@ import ShareDialog from "@/components/ShareDialog";
 import StatusBar from "@/components/StatusBar";
 import { localRoomKey, makeCapability } from "@/lib/room";
 import { joinRoom, saveSnapshot, type Scene } from "@/lib/rooms/api";
+import { createJoinRetry, type JoinRetry } from "@/lib/rooms/joinRetry";
 import type { PresenceCounts } from "@/lib/realtime/presence";
 import { openRoomConnection, type ConnectionStatus, type RoomConnection } from "@/lib/realtime/roomChannel";
 import { ensureAnonymousSession, getSupabase } from "@/lib/supabase";
@@ -78,6 +79,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     if (!api) return;
     let cancelled = false;
     let connection: RoomConnection | null = null;
+    let joinRetry: JoinRetry | null = null;
     let lastSceneReply = 0;
     const backup = readBackup(roomId);
     let lastBackup = 0;
@@ -111,6 +113,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
           if (ok) return;
           unmarkSent(sentRef.current, batch);
           pendingRef.current.restore(batch);
+          flusher.schedule();
         });
       },
     });
@@ -118,6 +121,9 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     async function persist(keepalive: boolean) {
       const supabase = getSupabase();
       if (!supabase || !api) throw new Error("Supabase unavailable");
+      // Saving replaces the stored board wholesale, so never save before the join loaded it.
+      // Throwing keeps unsaved events buffered and shows "Not saved — retrying".
+      if (!joinRetry?.joined) throw new Error("Room not joined yet");
       const events = unsavedRef.current.take();
       try {
         await saveSnapshot(supabase, { roomId, token, scene: sceneOf(api), events, keepalive });
@@ -153,40 +159,76 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
         setReady(true);
         return;
       }
-      const joined = await joinRoom(supabase, { roomId, token, role });
-      if (cancelled) return;
-      if (!joined.ok && joined.reason === "invalid") { setLinkError(true); return; }
+      const client = supabase;
 
-      const base = joined.ok ? joined.snapshot?.elements ?? [] : [];
-      const elements = role === "editor" && backup ? mergeByVersion(base, backup.elements) : base;
-      // Elements already in the DB snapshot are not new changes; only backup-only edits get re-sent and re-saved.
-      markSent(sentRef.current, base);
-      api!.updateScene({
-        elements: elements as never,
-        appState: appStateOf((joined.ok ? joined.snapshot?.appState : undefined) ?? backup?.appState),
-        captureUpdate: NEVER,
-      });
-      loaded = true;
-      setReady(true);
-      if (!joined.ok) { setStatus("offline"); return; }
+      const openConnection = () => {
+        connection = openRoomConnection(client, { roomId, clientId, role }, {
+          onElements: applyRemote,
+          onSyncRequest: () => {
+            if (role !== "editor") return;
+            const now = Date.now();
+            if (now - lastSceneReply < SYNC_REPLY_MIN_GAP_MS) return;
+            lastSceneReply = now;
+            sendFullScene();
+          },
+          onStatus: setStatus,
+          onPresence: setPresence,
+          onSubscribed: () => {
+            connection?.requestSync();
+            if (role === "editor") sendFullScene();
+          },
+        });
+        connectionRef.current = connection;
+      };
 
-      connection = openRoomConnection(supabase, { roomId, clientId, role }, {
-        onElements: applyRemote,
-        onSyncRequest: () => {
-          if (role !== "editor") return;
-          const now = Date.now();
-          if (now - lastSceneReply < SYNC_REPLY_MIN_GAP_MS) return;
-          lastSceneReply = now;
-          sendFullScene();
+      joinRetry = createJoinRetry({
+        join: () => joinRoom(client, { roomId, token, role }),
+        onInvalid: () => setLinkError(true),
+        onOffline: ({ firstAttempt }) => {
+          if (!firstAttempt) return;
+          // Show the local backup while the join retries; saving stays gated until it succeeds.
+          if (role === "editor" && backup) {
+            api!.updateScene({ elements: backup.elements as never, appState: appStateOf(backup.appState), captureUpdate: NEVER });
+          }
+          loaded = true;
+          setStatus("offline");
+          setReady(true);
         },
-        onStatus: setStatus,
-        onPresence: setPresence,
-        onSubscribed: () => {
-          connection?.requestSync();
-          if (role === "editor") sendFullScene();
+        onJoined: ({ snapshot }) => {
+          const stored = snapshot?.elements ?? [];
+          let localElements = api!.getSceneElementsIncludingDeleted() as unknown as SyncElement[];
+          // First load: the scene is still empty, so fold in the backup here.
+          if (!loaded && role === "editor" && backup) localElements = mergeByVersion(localElements, backup.elements);
+          const merged = mergeByVersion(localElements, stored, protectedIds(api!));
+          // Elements already in the DB snapshot are not new changes.
+          markSent(sentRef.current, stored);
+          api!.updateScene({
+            elements: merged as never,
+            appState: appStateOf(snapshot?.appState ?? (loaded ? undefined : backup?.appState)),
+            captureUpdate: NEVER,
+          });
+          loaded = true;
+          setReady(true);
+          if (role === "editor") {
+            // Re-queue exactly what differs from the stored board (backup-only or drawn while offline),
+            // dropping stale offline copies the snapshot already superseded.
+            pendingRef.current.take();
+            unsavedRef.current.take();
+            const changed = collectChanged(merged, sentRef.current);
+            pendingRef.current.add(changed);
+            unsavedRef.current.add(changed);
+            if (changed.length > 0) {
+              flusher.schedule();
+              saver?.notifyChange();
+            }
+            // Clears a "Not saved — retrying" left by gated saves without waiting out the backoff.
+            void saver?.flushNow();
+          }
+          setStatus("connecting");
+          openConnection();
         },
       });
-      connectionRef.current = connection;
+      joinRetry.start();
     }
 
     // Spec 4.3: hidden and pagehide both save with keepalive (when the body is small enough).
@@ -203,12 +245,16 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
       if (role === "editor") backupNow();
       void saver?.flushNow({ keepalive: true });
     };
+    const onOnline = () => joinRetry?.retryNow();
 
     void start();
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
+      joinRetry?.dispose();
+      window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
       flusher.flushNow();
