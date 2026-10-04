@@ -15,6 +15,7 @@ const SAVE: Record<SaveState, string> = {
   saving: "Saving…",
   retrying: "Not saved — retrying",
   failed: "Too large to save — kept on this device",
+  replaced: "Editor link replaced — rescan the QR code",
 };
 
 export const connectionLabel = (status: ConnectionStatus | "local") => CONNECTION[status];

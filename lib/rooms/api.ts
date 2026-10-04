@@ -31,7 +31,9 @@ export function buildSnapshotRequest(input: {
 }
 
 export function checkSnapshotResponse(status: number) {
-  if (status === 413) throw new PermanentSaveError("Board too large to save");
+  if (status === 413) throw new PermanentSaveError("Board too large to save", "failed");
+  // The editor token was rotated (owner re-entered); this tab's link can never save again.
+  if (status === 403) throw new PermanentSaveError("Editor link replaced", "replaced");
   if (status < 200 || status >= 300) throw new Error(`Snapshot save failed with ${status}`);
 }
 

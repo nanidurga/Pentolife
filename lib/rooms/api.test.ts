@@ -32,6 +32,19 @@ describe("checkSnapshotResponse", () => {
     expect(() => checkSnapshotResponse(413)).toThrow(PermanentSaveError);
   });
 
+  it("reports 413 as the too-large failure state", () => {
+    let error: unknown;
+    try { checkSnapshotResponse(413); } catch (e) { error = e; }
+    expect((error as PermanentSaveError).state).toBe("failed");
+  });
+
+  it("treats 403 (editor link replaced) as permanent with its own state", () => {
+    let error: unknown;
+    try { checkSnapshotResponse(403); } catch (e) { error = e; }
+    expect(error).toBeInstanceOf(PermanentSaveError);
+    expect((error as PermanentSaveError).state).toBe("replaced");
+  });
+
   it("treats other failures as retryable", () => {
     let error: unknown;
     try { checkSnapshotResponse(500); } catch (e) { error = e; }

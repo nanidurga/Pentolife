@@ -1,7 +1,12 @@
-export type SaveState = "saved" | "saving" | "retrying" | "failed";
+export type SaveState = "saved" | "saving" | "retrying" | "failed" | "replaced";
+export type PermanentSaveState = Extract<SaveState, "failed" | "replaced">;
 
+// A failure that retrying cannot fix. `state` picks the status copy: "failed" = too large, "replaced" = editor link rotated.
 export class PermanentSaveError extends Error {
   readonly permanent = true;
+  constructor(message: string, readonly state: PermanentSaveState = "failed") {
+    super(message);
+  }
 }
 
 export const DEFAULT_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
@@ -71,9 +76,10 @@ export function createSaver(options: {
         backingOff = true;
         dirty = true;
         clearTimers();
-        if ((error as { permanent?: boolean } | null)?.permanent) {
+        const permanent = error as { permanent?: boolean; state?: PermanentSaveState } | null;
+        if (permanent?.permanent) {
           attempt = 0;
-          emit("failed");
+          emit(permanent.state ?? "failed");
           return;
         }
         emit("retrying");

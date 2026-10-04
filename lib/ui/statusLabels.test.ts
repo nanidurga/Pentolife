@@ -24,5 +24,6 @@ describe("status labels", () => {
     expect(saveLabel("saving")).toBe("Saving…");
     expect(saveLabel("retrying")).toBe("Not saved — retrying");
     expect(saveLabel("failed")).toBe("Too large to save — kept on this device");
+    expect(saveLabel("replaced")).toBe("Editor link replaced — rescan the QR code");
   });
 });

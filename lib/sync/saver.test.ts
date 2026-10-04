@@ -67,6 +67,16 @@ describe("createSaver", () => {
     expect(states.at(-1)).toBe("failed");
   });
 
+  it("reports the permanent error's own state (editor link replaced)", async () => {
+    const save = vi.fn().mockRejectedValue(new PermanentSaveError("replaced", "replaced"));
+    const { saver, states } = setup(save);
+    saver.notifyChange();
+    await saver.flushNow();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(states.at(-1)).toBe("replaced");
+  });
+
   it("saves again when changes arrive during an in-flight save", async () => {
     let finish!: () => void;
     const save = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => { finish = r; })).mockResolvedValue(undefined);
