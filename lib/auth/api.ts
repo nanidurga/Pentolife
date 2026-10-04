@@ -75,21 +75,53 @@ export async function claimUsername(name: string): Promise<AuthResult> {
   const supabase = getSupabase();
   if (!supabase) return NOT_CONFIGURED;
   const { error } = await supabase.rpc("claim_username", { name: normalizeUsername(name) });
-  return error ? fail(authErrorMessage(error)) : OK;
+  if (!error || error.message === "username_already_set") return OK;
+  return fail(authErrorMessage(error));
 }
 
-// Confirmation and reset emails land here with either `?code=` (PKCE) or `#access_token=` (implicit,
-// picked up by the client on load). The client may already have exchanged the code itself, and React
-// may run this twice, so a failed exchange is not final: the session check below decides.
-export async function finishEmailLink(): Promise<AuthResult> {
+export type LinkEvidence = { kind: "token"; accessToken: string } | { kind: "code"; code: string };
+
+// What the email link itself carried. Without this, a session that already existed in the
+// browser would be mistaken for one the link created.
+export function emailLinkEvidence(search: string, hash: string): LinkEvidence | null {
+  const accessToken = new URLSearchParams(hash.replace(/^#/, "")).get("access_token");
+  if (accessToken) return { kind: "token", accessToken };
+  const code = new URLSearchParams(search).get("code");
+  return code ? { kind: "code", code } : null;
+}
+
+export function linkSessionMatches(
+  evidence: LinkEvidence,
+  session: { access_token: string; user: { is_anonymous?: boolean } } | null,
+) {
+  if (!session || session.user.is_anonymous) return false;
+  return evidence.kind === "code" || session.access_token === evidence.accessToken;
+}
+
+let linkCheck: { href: string; result: Promise<AuthResult> } | null = null;
+
+// Confirmation and reset emails land here. The URL is read before the Supabase client exists,
+// because the client clears the token from the hash while it initializes. React may run the
+// calling effect twice, so both runs share one check.
+export function finishEmailLink(): Promise<AuthResult> {
+  const { href, search, hash } = window.location;
+  if (linkCheck?.href !== href) linkCheck = { href, result: completeEmailLink(search, hash).catch(() => fail(EXPIRED_LINK_MESSAGE)) };
+  return linkCheck.result;
+}
+
+async function completeEmailLink(search: string, hash: string): Promise<AuthResult> {
+  const linkError = emailLinkError(search, hash);
+  if (linkError) return fail(linkError);
+  const evidence = emailLinkEvidence(search, hash);
+  if (!evidence) return fail(EXPIRED_LINK_MESSAGE);
   const supabase = getSupabase();
   if (!supabase) return NOT_CONFIGURED;
-  const linkError = emailLinkError(window.location.search, window.location.hash);
-  if (linkError) return fail(linkError);
-  const code = new URLSearchParams(window.location.search).get("code");
-  if (code) await supabase.auth.exchangeCodeForSession(code);
+  if (evidence.kind === "code") {
+    const { error } = await supabase.auth.exchangeCodeForSession(evidence.code);
+    if (error) return fail(EXPIRED_LINK_MESSAGE);
+  }
   const { data: { session } } = await supabase.auth.getSession();
-  return session && !session.user.is_anonymous ? OK : fail(EXPIRED_LINK_MESSAGE);
+  return linkSessionMatches(evidence, session) ? OK : fail(EXPIRED_LINK_MESSAGE);
 }
 
 export async function signOut() {

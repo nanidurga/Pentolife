@@ -11,7 +11,8 @@ import { relativeTime } from "@/lib/ui/relativeTime";
 type Board = { id: string; title: string; updated_at: string };
 type RoomRequest = { action: "create" } | { action: "owner-access"; roomId: string };
 
-export default function Dashboard({ username, onProfileChange }: { username: string | null; onProfileChange: () => void }) {
+// `username` is undefined when the profile could not be loaded; null when the account has none yet.
+export default function Dashboard({ username, onProfileChange }: { username: string | null | undefined; onProfileChange: () => void }) {
   const router = useRouter();
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -52,7 +53,7 @@ export default function Dashboard({ username, onProfileChange }: { username: str
       </details>
     </header>
     <main className="dashboard">
-      {!username && <ClaimUsername onClaimed={onProfileChange} />}
+      {username === null && <ClaimUsername onClaimed={onProfileChange} />}
       <div className="section-head"><h1>Boards</h1>{boards && boards.length > 0 && <span className="muted">{boards.length}</span>}</div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {boards === null ? <p className="muted">Loading…</p>

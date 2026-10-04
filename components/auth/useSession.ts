@@ -3,12 +3,13 @@
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { latestOnly, profileFrom, type Profile } from "@/lib/auth/session";
 import { getSupabase } from "@/lib/supabase";
 
 export type SessionState =
   | { status: "loading" }
   | { status: "signed-out" }
-  | { status: "signed-in"; user: User; profile: { username: string | null } };
+  | { status: "signed-in"; user: User; profile: Profile };
 
 // Anonymous users (people who only opened a shared room link) count as signed out.
 export function useSession(): SessionState & { reload: () => void } {
@@ -22,13 +23,17 @@ export function useSession(): SessionState & { reload: () => void } {
       return;
     }
     let cancelled = false;
+    const begin = latestOnly();
+    // Auth events can overlap (a token refresh still fetching the profile when the user signs out);
+    // only the newest event's result is applied.
     async function load(user: User | null) {
+      const isLatest = begin();
       if (!user || user.is_anonymous) {
-        if (!cancelled) setState({ status: "signed-out" });
+        if (!cancelled && isLatest()) setState({ status: "signed-out" });
         return;
       }
-      const { data } = await supabase!.from("profiles").select("username").eq("id", user.id).maybeSingle();
-      if (!cancelled) setState({ status: "signed-in", user, profile: { username: data?.username ?? null } });
+      const result = await supabase!.from("profiles").select("username").eq("id", user.id).maybeSingle();
+      if (!cancelled && isLatest()) setState({ status: "signed-in", user, profile: profileFrom(result) });
     }
     // Supabase must not be called from inside the auth callback itself (it can deadlock), so defer.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
