@@ -67,6 +67,10 @@ All of tests, type check and build must be green before you call work done.
 - A failed send must never be retried on a tight timer. The full-scene send on resubscribe covers it.
 - Secrets: never put the Supabase service-role key in Next.js or Vercel env vars, or prefix a secret with `NEXT_PUBLIC_`.
 - UI status copy is fixed in `lib/ui/statusLabels.ts`. Change it there, together with its tests.
+- Accounts:
+  - `authenticated` may update only `profiles.display_name` (a column grant). Usernames change only through the sign-up trigger and `claim_username`. Never re-grant table-wide UPDATE.
+  - Email-link pages trust only the session that the link's own token or code created (`finishEmailLink`), never a session that already existed in the browser.
+  - Sign-in failures always return the same "invalid credentials" error, so they never reveal whether a username exists.
 
 ## Backend operations (live Supabase project)
 
@@ -96,6 +100,9 @@ All of tests, type check and build must be green before you call work done.
 - `next-env.d.ts` flips between `.next/types` (after `next build`) and `.next/dev/types` (after `next dev`). Never stage it. `next dev` also re-adds this file's Next.js block, which is committed; keep it.
 - No `main` branch exists. `basic-features` is the GitHub default branch, and PRs target it.
 - The Vercel CLI is not installed. Ask the user to set Vercel env vars.
+- Public `auth.signUp` returns the profile trigger's raw Postgres error (`username_reserved`, `... profiles_username_key`), not a generic message. Map new trigger errors in `lib/auth/messages.ts`.
+- Auth email uses Supabase's built-in sender: 2 emails per hour, delivered only to project team members. To test sign-in without sending email, create a pre-confirmed user with the admin API (`POST /auth/v1/admin/users`, `email_confirm: true`), then delete it.
+- The Supabase client uses the implicit flow, so email links arrive as `#access_token=...`. auth-js clears the hash while it initializes, so read the URL before calling `getSupabase()`.
 
 ## Finishing a feature
 
