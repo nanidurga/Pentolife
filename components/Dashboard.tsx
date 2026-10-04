@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
+import Logo, { LogoMark } from "@/components/Logo";
 import UsernameField, { type UsernameStatus } from "@/components/auth/UsernameField";
 import { claimUsername, signOut } from "@/lib/auth/api";
 import { getSupabase } from "@/lib/supabase";
@@ -42,9 +42,9 @@ export default function Dashboard({ username, onProfileChange }: { username: str
 
   const now = new Date();
 
-  return <>
+  return <div className="app-shell paper">
     <header className="app-header">
-      <Link href="/" className="wordmark">PentoLive</Link>
+      <Logo />
       <span className="spacer" />
       <button className="primary" onClick={() => enter({ action: "create" })} disabled={busy}>New board</button>
       <details className="menu">
@@ -58,7 +58,8 @@ export default function Dashboard({ username, onProfileChange }: { username: str
       {error && <p className="form-error" role="alert">{error}</p>}
       {boards === null ? <p className="muted">Loading…</p>
         : boards.length === 0 ? <div className="empty">
-          <p className="muted">No boards yet.</p>
+          <LogoMark size={40} />
+          <p className="muted">No boards yet. Create one, then share its link with your interviewer.</p>
           <button className="primary" onClick={() => enter({ action: "create" })} disabled={busy}>New board</button>
         </div>
         : <ul className="board-list">{boards.map((board) => <li key={board.id}>
@@ -67,7 +68,7 @@ export default function Dashboard({ username, onProfileChange }: { username: str
           </button>
         </li>)}</ul>}
     </main>
-  </>;
+  </div>;
 }
 
 function ClaimUsername({ onClaimed }: { onClaimed: () => void }) {
