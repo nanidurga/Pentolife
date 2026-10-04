@@ -60,6 +60,10 @@ All of tests, type check and build must be green before you call work done.
   - Only editors send on `room:{id}`.
   - Viewers send only on `room:{id}:interact`.
   - Joining via the viewer link must never downgrade an existing editor membership.
+- Realtime authorization:
+  - Policies on `realtime.messages` run as `authenticated`, which cannot read `room_members` (revoked on purpose).
+  - Check membership only through the security-definer `public.is_room_member(topic, editor_only)`. A direct subquery fails with "permission denied", and every private channel then shows "Unauthorized".
+- Anonymous sign-ins must stay enabled in Supabase Auth. Tablets and interviewers open room links without an account; with anonymous sign-ins off, the board shows "Offline".
 - Saving:
   - Never save before a successful join. A failed join must not overwrite the stored board with a local-only scene.
   - Snapshots replace the whole board on the server.
