@@ -28,13 +28,21 @@ export function signInMessage(code: string | undefined) {
 
 // Sign-up, claim and password errors from supabase-js or PostgREST.
 export function authErrorMessage(error: { message?: string; code?: string; status?: number }) {
-  // The unique index, format check and reserved-name check in the profile trigger
-  // all surface from auth.signUp as this one message.
-  if (error.message === "Database error saving new user" || error.message === "username_taken") return USERNAME_UNAVAILABLE;
+  // auth.signUp passes the profile trigger's raw Postgres error through (reserved name,
+  // unique index or format check); claim_username raises username_taken.
+  if (isUsernameRejection(error.message ?? "")) return USERNAME_UNAVAILABLE;
   if (error.code === "weak_password") return PASSWORD_MESSAGES.too_short;
   if (error.code === "same_password") return "Choose a password different from your current one.";
   if (error.status === 429 || error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit") return RATE_LIMITED;
   return GENERIC_ERROR_MESSAGE;
+}
+
+function isUsernameRejection(message: string) {
+  return message === "Database error saving new user"
+    || message === "username_taken"
+    || message === "username_reserved"
+    || message.includes("profiles_username_key")
+    || message.includes("profiles_username_format");
 }
 
 // Supabase reports a failed email link as `error`/`error_description` in the query or hash.

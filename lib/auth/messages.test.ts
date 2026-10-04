@@ -24,6 +24,12 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage({ message: "username_taken" })).toBe("That username isn't available. Try another.");
   });
 
+  it("maps the raw trigger errors that public sign-up returns", () => {
+    expect(authErrorMessage({ message: "username_reserved", code: "P0001" })).toBe("That username isn't available. Try another.");
+    expect(authErrorMessage({ message: "duplicate key value violates unique constraint \"profiles_username_key\"" })).toBe("That username isn't available. Try another.");
+    expect(authErrorMessage({ message: "new row for relation \"profiles\" violates check constraint \"profiles_username_format\"" })).toBe("That username isn't available. Try another.");
+  });
+
   it("maps password and rate-limit errors", () => {
     expect(authErrorMessage({ code: "weak_password" })).toBe("Use at least 8 characters.");
     expect(authErrorMessage({ code: "same_password" })).toBe("Choose a password different from your current one.");
