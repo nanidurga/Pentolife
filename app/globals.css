@@ -110,7 +110,8 @@ button { font: inherit; cursor: pointer; }
 /* Room */
 .room { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
 .topbar { align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; font-size: 13px; gap: 16px; min-height: 48px; padding: 6px 16px; }
-.brand { align-items: center; display: inline-flex; font-weight: 600; gap: 6px; letter-spacing: -0.02em; }
+.brand { align-items: center; border-radius: var(--radius); color: var(--text); display: inline-flex; font-weight: 600; gap: 6px; letter-spacing: -0.02em; margin: -4px -6px; padding: 4px 6px; text-decoration: none; }
+.brand:hover { background: var(--bg); }
 .status { align-items: center; color: var(--text); display: inline-flex; font-weight: 500; gap: 7px; margin-right: auto; }
 .status.offline { color: var(--warning); }
 .presence, .save { color: var(--muted); }

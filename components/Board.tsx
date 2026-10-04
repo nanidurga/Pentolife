@@ -19,6 +19,7 @@ import { createPendingSet } from "@/lib/sync/pending";
 import { createSaver, type SaveState, type Saver } from "@/lib/sync/saver";
 import { createFlusher, type Flusher } from "@/lib/sync/throttle";
 import type { SyncElement } from "@/lib/sync/types";
+import { initialAppState } from "@/lib/ui/penTool";
 
 const Excalidraw = dynamic(() => import("@excalidraw/excalidraw").then((module) => module.Excalidraw), { ssr: false });
 
@@ -269,6 +270,13 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
     };
   }, [api, clientId, local, role, roomId, token]);
 
+  // Tablet pens: editors on a touch device start with the pen tool (see lib/ui/penTool.ts).
+  const initialData = useMemo(() => {
+    const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    const appState = initialAppState(role, coarse);
+    return appState ? { appState } : undefined;
+  }, [role]);
+
   const onChange = useCallback((elements: readonly unknown[], appState: { viewBackgroundColor: string }) => {
     if (role === "viewer") return;
     if (local) {
@@ -305,6 +313,7 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
       {!ready && <div className="loading">Opening board…</div>}
       <Excalidraw
         excalidrawAPI={setApi}
+        initialData={initialData}
         onChange={onChange}
         viewModeEnabled={role === "viewer"}
         UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false } }}
