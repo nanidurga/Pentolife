@@ -15,7 +15,7 @@ Without environment variables, the app is still usable as a single-browser proto
 
 1. Create a free Supabase project.
 2. In **Authentication → Providers → Anonymous**, enable anonymous sign-ins.
-3. Open the SQL Editor and run [`supabase/migrations/202609250001_rooms.sql`](supabase/migrations/202609250001_rooms.sql).
+3. Open the SQL Editor and run, in order, every file in [`supabase/migrations`](supabase/migrations).
 4. Install the Supabase CLI, authenticate it locally, link the project, then deploy the edge function:
 
    ```bash
@@ -39,6 +39,7 @@ The Edge Function uses Supabase-managed `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
    ```text
    NEXT_PUBLIC_SUPABASE_URL
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+   CRON_SECRET                            any long random string; enables the daily keep-alive that stops the free-tier Supabase project from pausing.
    ```
 
 4. Deploy. Vercel builds the application remotely, so your laptop does not need to run the production server.
@@ -50,5 +51,8 @@ The Edge Function uses Supabase-managed `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
 - Every join creates a Supabase anonymous session tied to a room role.
 - Supabase Realtime policies permit receiving broadcasts only for room members and sending broadcasts only for editors.
 - Viewer links are read-only in the canvas UI and are denied broadcast-write access by the Realtime policy.
+- Viewers may send only on the `room:{id}:interact` channel (sync requests and presence); drawing stays editor-only.
+- Boards created while signed in never expire. Anonymous boards expire after 30 days.
+- Reopening a board from the dashboard rotates the editor link but keeps the viewer link, so links you already shared keep working. Rescan the QR on your tablet after reopening.
 
-For now, rooms expire after 30 days. Do not share editor links with interviewers.
+Do not share editor links with interviewers.
