@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { normalizeDetails } from "../_shared/boardDetails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,10 +43,13 @@ Deno.serve(async (request) => {
   const body = await request.json();
 
   if (body.action === "create") {
+    const checked = normalizeDetails(body);
+    if (!checked.ok) return json({ error: checked.message, field: checked.field }, 400);
     const editorToken = randomToken();
     const viewerToken = randomToken();
     const owned = !user.is_anonymous;
     const { data: room, error } = await admin.from("rooms").insert({
+      ...checked.details,
       editor_token_hash: await hash(editorToken),
       viewer_token_hash: await hash(viewerToken),
       viewer_token: viewerToken,
@@ -71,6 +75,18 @@ Deno.serve(async (request) => {
     }
     await admin.from("rooms").update(update).eq("id", body.roomId);
     return json({ roomId: body.roomId, editorToken, viewerToken });
+  }
+
+  if (body.action === "update-details") {
+    if (user.is_anonymous || !body.roomId) return json({ error: "Sign in with your personal account first." }, 403);
+    const checked = normalizeDetails(body);
+    if (!checked.ok) return json({ error: checked.message, field: checked.field }, 400);
+    // Leaves updated_at alone: "recently edited" means drawing, not renaming.
+    const { data: board, error } = await admin.from("rooms").update(checked.details)
+      .eq("id", body.roomId).eq("owner_id", user.id).select("id, title, role, company").maybeSingle();
+    if (error) return json({ error: "Could not save details." }, 500);
+    if (!board) return json({ error: "Board not found." }, 404);
+    return json({ board });
   }
 
   const { roomId, token } = body;
