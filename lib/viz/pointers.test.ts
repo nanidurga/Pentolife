@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { gridPointers, pointersFor } from "@/lib/viz/pointers";
+import type { Value } from "@/lib/viz/trace";
 
 const n = (v: number | string) => ({ t: "num", v }) as const;
 
 describe("pointersFor", () => {
   it("labels integer locals with pointer names that index the sequence", () => {
-    const locals = { i: n(0), j: n(2), mid: n(4), lo_2: n(1), count: n(1), list: n(1), a: { t: "list", kind: "list", items: [] } as const };
+    const locals = { i: n(0), j: n(2), mid: n(4), lo_2: n(1), count: n(1), list: n(1), a: { t: "list", kind: "list", items: [] } as Value };
     expect(pointersFor(5, locals)).toEqual([
       { name: "i", index: 0, end: false },
       { name: "lo_2", index: 1, end: false },

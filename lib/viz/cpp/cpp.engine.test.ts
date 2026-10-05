@@ -1,12 +1,13 @@
 import * as shim from "@bjorn3/browser_wasi_shim";
-import { runClang } from "@yowasp/clang";
+// The package typings omit runClang, which the runtime exports (see its README).
+import * as clang from "@yowasp/clang";
 import { beforeAll, describe, expect, it } from "vitest";
 import { runCpp, type CppEngine, type RunClang } from "@/lib/viz/cpp/run";
 import { cppParser } from "@/lib/viz/cpp/testParser";
 import { TEMPLATES } from "@/lib/viz/templates";
 
 let engine: CppEngine;
-beforeAll(async () => { engine = { runClang: runClang as unknown as RunClang, shim, parser: await cppParser() }; });
+beforeAll(async () => { engine = { runClang: (clang as unknown as { runClang: RunClang }).runClang, shim, parser: await cppParser() }; });
 
 describe("C++ pipeline", () => {
   it("records lines, locals, frames and stdout", async () => {
