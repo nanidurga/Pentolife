@@ -56,6 +56,7 @@ All of tests, type check and build must be green before you call work done.
 - Excalidraw:
   - Load it only via `next/dynamic` with `ssr: false`. Other files import types only from `@excalidraw/excalidraw/*`.
   - Keep the version pinned to exactly `0.18.1`.
+  - Never let anything in the page flow above or around the canvas change size or disappear after Excalidraw mounts (overlay it instead, like `.loading`). Excalidraw measures its offset once at mount, so a shifted canvas makes every stroke land away from the pen.
 - Apply remote changes with `captureUpdate: "NEVER"`, so they never enter local undo history.
 - Send rights:
   - Only editors send on `room:{id}`.
