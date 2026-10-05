@@ -300,10 +300,12 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
   };
 
   if (linkError) {
-    return <main className="link-error">
-      <h1>This board link is invalid or expired</h1>
-      <p className="muted">Ask for a fresh link, or create a new board.</p>
-      <Link className="primary" href="/">Go home</Link>
+    return <main className="link-error paper">
+      <section className="auth-card">
+        <h1>This board link is invalid or expired</h1>
+        <p className="muted">Ask for a fresh link, or create a new board.</p>
+        <Link className="primary" href="/">Go home</Link>
+      </section>
     </main>;
   }
 

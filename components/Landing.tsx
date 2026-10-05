@@ -6,7 +6,7 @@ export default function Landing() {
     <header className="landing-nav"><Logo /></header>
     <section className="hero">
       <span className="live-pill"><span className="live-dot" />Live whiteboard</span>
-      <h1>Think out loud,<br /> on paper they can see.</h1>
+      <h1>Think out loud,<br /> <span className="highlight">on paper</span> they can see.</h1>
       <p className="muted">Draw on your tablet. Your interviewer follows every stroke from one private link.</p>
       <div className="actions">
         <Link className="primary" href="/signup">Create account</Link>
