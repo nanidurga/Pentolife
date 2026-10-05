@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["node_modules/**", ".next/**", "supabase/functions/**"],
+    // Engine tests download nothing but take minutes; run them with `npm run test:engines`.
+    exclude: ["node_modules/**", ".next/**", "supabase/functions/**", "**/*.engine.test.ts"],
   },
 });

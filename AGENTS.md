@@ -18,6 +18,8 @@ A tablet-first live whiteboard for technical interviews. The candidate draws on 
 |---|---|
 | Dev server | `npm run dev` (port 3000) |
 | Unit tests (vitest) | `npm test` |
+| Engine tests (real Pyodide + clang in Node, minutes) | `npm run test:engines` |
+| Visualizer assets (workers + precompiled C++ prelude into `public/viz/`, also runs before dev/build) | `npm run build:workers` |
 | Type check | `npx tsc --noEmit` |
 | Production build | `npm run build` |
 | Lint | `npm run lint`. This currently fails because the repo has no `eslint.config.*`; that is a known pre-existing gap. |
@@ -27,7 +29,7 @@ All of tests, type check and build must be green before you call work done.
 ## Layout
 
 - `app/`: routes.
-  - `room/[roomId]` is the board.
+  - `room/[roomId]` is the board; `room/[roomId]/visualize` is the live algorithm visualizer (same links, switch in the top bar).
   - `/` shows the landing page when signed out and the dashboard when signed in.
   - `signup`, `signin`, `forgot-password`, `reset-password` and `auth/callback` handle email + password accounts with self-chosen usernames.
   - `/dashboard` and `/login` redirect to `/` and `/signin` (see `next.config.ts`).
@@ -42,6 +44,11 @@ All of tests, type check and build must be green before you call work done.
 - `lib/rooms/*`: the Edge Function client (`api.ts`, `boards.ts`) and join retry. `details.ts` re-exports `supabase/functions/_shared/boardDetails.ts`, the board name/role/company rules shared with the `rooms` function.
 - `lib/dashboard/*`: pure, unit-tested dashboard logic: filters and sort kept in the URL (`filter.ts`) and role/company grouping and suggestions (`tags.ts`). Role and company match by `tagKey` (trimmed, collapsed spaces, lower case).
 - `lib/realtime/*`: channels, connection status and presence.
+- `lib/viz/*` + `components/viz/*`: the visualizer.
+  - `engines.ts` pins the engine versions (loaded from jsDelivr inside workers; `engines.test.ts` keeps them equal to the devDependencies) and the limits.
+  - `trace.ts` is the one step format both languages produce. `python/` traces with `sys.settrace` on Pyodide; `cpp/` inserts step calls with tree-sitter (`instrument.ts`), compiles with `@yowasp/clang` against `prelude.ts`, and runs through a WASI shim that reads steps from file descriptor 3.
+  - `workers/*.worker.ts` are bundled by `scripts/build-viz-workers.mjs` (Turbopack copies `new Worker(new URL(...))` targets as raw `.ts`). `runner.ts` hosts them with a hard timeout.
+  - `messages.ts`/`channel.ts`: the `room:<id>:viz` topic (code, chunked trace, step) and `viz-sync-request` on `:interact`.
 - `supabase/migrations/*.sql`: run in filename order. Write each new migration so it can be re-run safely (`if not exists`, `create or replace`, `drop policy if exists`).
 - `supabase/functions/rooms/index.ts`: Deno Edge Function with the `create`, `join`, `snapshot`, `owner-access` and `update-details` actions. `update-details` is owner-only and never changes `updated_at`.
 - `supabase/functions/auth/index.ts`: signs in with "email or username" so emails never reach the browser.
@@ -72,7 +79,9 @@ All of tests, type check and build must be green before you call work done.
 - Broadcast payloads stay at or below `MAX_CHUNK_BYTES`, which is 200 KB; the Supabase free tier caps payloads at 256 KB.
 - A failed send must never be retried on a tight timer. The full-scene send on resubscribe covers it.
 - Secrets: never put the Supabase service-role key in Next.js or Vercel env vars, or prefix a secret with `NEXT_PUBLIC_`.
-- UI status copy is fixed in `lib/ui/statusLabels.ts`. Change it there, together with its tests.
+- UI status copy is fixed in `lib/ui/statusLabels.ts`. Change it there, together with its tests. Visualizer copy lives in `lib/viz/copy.ts`.
+- Visualizer: only editors send on `room:<id>:viz`; viewers send only `viz-sync-request` on `:interact`; every payload stays ≤ `MAX_CHUNK_BYTES` (trace pieces are cut at `TRACE_PIECE_BYTES`, half the limit, because JSON escaping can double them). Viewers never run code.
+- C++ instrumentation must never add or remove lines (clang errors and the highlighted line rely on it), and must skip what a lambda can't capture (variable-length arrays) and code it must not touch (lambda bodies, `constexpr` functions, preprocessor lines).
 - Styling ("Marker Board") lives in `app/globals.css` tokens. Global rules must not restyle Excalidraw: avoid generic class names it also uses (it has `.empty`), and keep the `.excalidraw h1/h2` reset. Never rotate forms, fields or buttons.
 - Accounts:
   - `authenticated` may update only `profiles.display_name` (a column grant). Usernames change only through the sign-up trigger and `claim_username`. Never re-grant table-wide UPDATE.
@@ -114,6 +123,10 @@ All of tests, type check and build must be green before you call work done.
 - vitest runs in node with no DOM, so components and CSS are verified in a browser. When the Chrome extension is not connected, drive headless Chrome over the DevTools protocol; its `--window-size` never goes below 500px wide, so use `Emulation.setDeviceMetricsOverride` for phone widths.
 - Dashboard filters update the URL with `window.history.replaceState`, not `router.replace`: the router's server round trip let quick successive changes overwrite each other.
 - The Management API `database/query` endpoint returns only the last statement's result; query one thing per call when verifying.
+
+- clang (`@yowasp/clang`) writes stderr one byte at a time; buffer it. Its typings omit `runClang`, which the runtime exports.
+- C++ compiles as C++17 with the prelude precompiled at build time (`public/viz/__pl.h.pch`, rebuilt only when the prelude, flags or clang version change). C++20 headers made each in-browser compile ~4× slower. A PCH must be used with exactly the flags it was built with.
+- A stale `.next/dev` can make `next dev` answer 404 for a new route (and break `tsc` through `.next/dev/types`). Delete `.next/dev` and restart.
 
 ## Finishing a feature
 

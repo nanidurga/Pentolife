@@ -5,3 +5,6 @@ supabase/.temp/
 .env*
 !.env.example
 *.tsbuildinfo
+
+# Visualizer workers, built by scripts/build-viz-workers.mjs
+/public/viz/
