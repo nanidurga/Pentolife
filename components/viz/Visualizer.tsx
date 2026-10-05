@@ -150,6 +150,8 @@ export default function Visualizer({ roomId, role, token, viewerToken, local }: 
               setHeardEditor(true);
               setNoEditor(false);
               driving.current = false;
+              // The matching viz-step can arrive before React re-renders; let onStep see this run now.
+              latest.current = { ...latest.current, run: { runId, trace }, step: 0 };
               setRun({ runId, trace });
               setStep(0);
               setPlaying(false);

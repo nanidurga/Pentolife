@@ -1,5 +1,5 @@
 import type { Parser } from "web-tree-sitter";
-import { CLANG_FLAGS, PRELUDE, PRELUDE_INCLUDE } from "@/lib/viz/cpp/prelude";
+import { CLANG_FLAGS, PCH_FILE, PRELUDE, PRELUDE_INCLUDE } from "@/lib/viz/cpp/prelude";
 import { instrument } from "@/lib/viz/cpp/instrument";
 import { VIZ_COPY } from "@/lib/viz/copy";
 import { LIMITS } from "@/lib/viz/engines";
@@ -7,7 +7,8 @@ import type { Step, Trace, TraceError } from "@/lib/viz/trace";
 
 export type RunClang = (args: string[], files: Record<string, string | Uint8Array>, options?: { stderr?: (bytes: Uint8Array | null) => void }) => Promise<Record<string, unknown>>;
 export type WasiShim = typeof import("@bjorn3/browser_wasi_shim");
-export type CppEngine = { runClang: RunClang; shim: WasiShim; parser: Parser };
+/** `pch`: the prelude precompiled with CLANG_FLAGS; without it every compile re-parses the prelude. */
+export type CppEngine = { runClang: RunClang; shim: WasiShim; parser: Parser; pch?: Uint8Array };
 export type CppPhase = "compiling" | "running";
 
 const ERROR_LINE = /main\.cc:(\d+):\d+: (?:fatal )?error: (.*)/;
@@ -24,20 +25,30 @@ export function compileError(stderr: string): TraceError {
   return { kind: "compile", message: message || "Compile failed." };
 }
 
+export async function buildPch(runClang: RunClang): Promise<Uint8Array> {
+  const files = await runClang(["clang++", ...CLANG_FLAGS, "-x", "c++-header", "__pl.h", "-o", PCH_FILE], { "__pl.h": PRELUDE });
+  return files[PCH_FILE] as Uint8Array;
+}
+
 export async function runCpp(engine: CppEngine, code: string, stdin: string, onPhase?: (phase: CppPhase) => void): Promise<Trace> {
   const tree = engine.parser.parse(code);
   const traceable = !!tree && !tree.rootNode.hasError;
-  const source = traceable ? PRELUDE_INCLUDE + instrument(tree!.rootNode, code) : code;
+  const instrumented = traceable ? instrument(tree!.rootNode, code) : code;
+  // With the precompiled prelude the source needs no prefix, so its lines are already the user's.
+  const source = engine.pch ? instrumented : traceable ? PRELUDE_INCLUDE + instrumented : code;
+  const pchArgs = engine.pch ? ["-include-pch", PCH_FILE] : [];
+  const files: Record<string, string | Uint8Array> = { "main.cc": source, "__pl.h": PRELUDE };
+  if (engine.pch) files[PCH_FILE] = engine.pch;
   onPhase?.("compiling");
   let stderr = "";
   const decoder = new TextDecoder();
   let wasm: Uint8Array;
   try {
-    const files = await engine.runClang(["clang++", ...CLANG_FLAGS, "main.cc", "-o", "prog.wasm"], { "main.cc": source, "__pl.h": PRELUDE }, {
+    const output = await engine.runClang(["clang++", ...CLANG_FLAGS, ...pchArgs, "main.cc", "-o", "prog.wasm"], files, {
       // clang writes stderr a byte at a time.
       stderr: (bytes) => { if (bytes) stderr += decoder.decode(bytes, { stream: true }); },
     });
-    wasm = files["prog.wasm"] as Uint8Array;
+    wasm = output["prog.wasm"] as Uint8Array;
   } catch {
     return { language: "cpp", steps: [], stdout: "", error: compileError(stderr) };
   }

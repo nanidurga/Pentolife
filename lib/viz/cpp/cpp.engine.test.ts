@@ -2,7 +2,7 @@ import * as shim from "@bjorn3/browser_wasi_shim";
 // The package typings omit runClang, which the runtime exports (see its README).
 import * as clang from "@yowasp/clang";
 import { beforeAll, describe, expect, it } from "vitest";
-import { runCpp, type CppEngine, type RunClang } from "@/lib/viz/cpp/run";
+import { buildPch, runCpp, type CppEngine, type RunClang } from "@/lib/viz/cpp/run";
 import { cppParser } from "@/lib/viz/cpp/testParser";
 import { TEMPLATES } from "@/lib/viz/templates";
 
@@ -58,5 +58,24 @@ describe("C++ pipeline", () => {
       expect(trace.steps.length, template.id).toBeGreaterThan(3);
       expect(trace.stdout.length, template.id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("precompiled prelude", () => {
+  it("builds once and compiles a template with it, faster than without", async () => {
+    const pch = await buildPch(engine.runClang);
+    expect(pch.length).toBeGreaterThan(100_000);
+    const template = TEMPLATES.cpp[0];
+    const withPch = { ...engine, pch };
+    await runCpp(withPch, template.code, "");
+    const started = performance.now();
+    const trace = await runCpp(withPch, template.code, "");
+    const elapsed = performance.now() - started;
+    expect(trace.error).toBeUndefined();
+    expect(trace.steps.length).toBeGreaterThan(3);
+    expect(trace.stdout).toBe("1 2 4 5 8 " + String.fromCharCode(10));
+    const compileError = await runCpp(withPch, ["int main() {", "  int a = 1;", "  b = a;", "}", ""].join(String.fromCharCode(10)), "");
+    expect(compileError.error).toMatchObject({ kind: "compile", line: 3 });
+    console.log(`warm run with pch: ${Math.round(elapsed)} ms`);
   });
 });

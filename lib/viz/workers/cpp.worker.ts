@@ -1,4 +1,5 @@
 import type { Parser } from "web-tree-sitter";
+import { PCH_FILE } from "@/lib/viz/cpp/prelude";
 import { runCpp, type CppEngine, type RunClang, type WasiShim } from "@/lib/viz/cpp/run";
 import { VIZ_COPY } from "@/lib/viz/copy";
 import { ENGINE_URLS } from "@/lib/viz/engines";
@@ -9,6 +10,16 @@ let engine: Promise<CppEngine> | null = null;
 
 type TreeSitter = { Parser: { init(o: { locateFile(file: string): string }): Promise<void>; new (): Parser }; Language: { load(url: string): Promise<Parameters<Parser["setLanguage"]>[0]> } };
 
+// Shipped by scripts/build-viz-workers.mjs. Without it compiles still work, just slower.
+async function loadPch(): Promise<Uint8Array | undefined> {
+  try {
+    const response = await fetch(`/viz/${PCH_FILE}`);
+    return response.ok ? new Uint8Array(await response.arrayBuffer()) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function load(): Promise<CppEngine> {
   const [clang, shim, ts] = await Promise.all([
     import(/* webpackIgnore: true */ ENGINE_URLS.clang) as Promise<{ runClang: RunClang }>,
@@ -18,7 +29,7 @@ async function load(): Promise<CppEngine> {
   await ts.Parser.init({ locateFile: (file) => ENGINE_URLS.treeSitterDir + file });
   const parser = new ts.Parser();
   parser.setLanguage(await ts.Language.load(ENGINE_URLS.cppGrammar));
-  return { runClang: clang.runClang, shim, parser };
+  return { runClang: clang.runClang, shim, parser, pch: await loadPch() };
 }
 
 ctx.onmessage = async ({ data }) => {

@@ -1,5 +1,10 @@
 // Compiled in front of the user's program. Every recorded step goes to file descriptor 3 as one JSON line.
-export const CLANG_FLAGS = ["-std=c++20", "-O1", "-fno-exceptions", "-w"];
+// C++17 parses the standard headers far faster than C++20 in the WebAssembly clang; clang still
+// accepts lambda captures of structured bindings there as an extension (warnings are off).
+export const CLANG_FLAGS = ["-std=c++17", "-O1", "-fno-exceptions", "-w"];
+
+// The prelude precompiled with CLANG_FLAGS (scripts/build-viz-workers.mjs ships it to /viz/).
+export const PCH_FILE = "__pl.h.pch";
 
 // `#line` makes clang report the user's own line numbers for main.cc.
 export const PRELUDE_INCLUDE = '#include "__pl.h"\n#line 1 "main.cc"\n';
