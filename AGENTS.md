@@ -39,10 +39,11 @@ All of tests, type check and build must be green before you call work done.
   - snapshot saves
   - presence
 - `lib/sync/*`: pure, unit-tested sync logic: diff, chunk, merge, pending, throttle, saver. Constants live in `lib/sync/messages.ts`.
-- `lib/rooms/*`: the Edge Function client (`api.ts`) and join retry.
+- `lib/rooms/*`: the Edge Function client (`api.ts`, `boards.ts`) and join retry. `details.ts` re-exports `supabase/functions/_shared/boardDetails.ts`, the board name/role/company rules shared with the `rooms` function.
+- `lib/dashboard/*`: pure, unit-tested dashboard logic: filters and sort kept in the URL (`filter.ts`) and role/company grouping and suggestions (`tags.ts`). Role and company match by `tagKey` (trimmed, collapsed spaces, lower case).
 - `lib/realtime/*`: channels, connection status and presence.
 - `supabase/migrations/*.sql`: run in filename order. Write each new migration so it can be re-run safely (`if not exists`, `create or replace`, `drop policy if exists`).
-- `supabase/functions/rooms/index.ts`: Deno Edge Function with the `create`, `join`, `snapshot` and `owner-access` actions.
+- `supabase/functions/rooms/index.ts`: Deno Edge Function with the `create`, `join`, `snapshot`, `owner-access` and `update-details` actions. `update-details` is owner-only and never changes `updated_at`.
 - `supabase/functions/auth/index.ts`: signs in with "email or username" so emails never reach the browser.
   - Deploy it with `--no-verify-jwt`, because callers are signed out.
   - It shares `supabase/functions/_shared/username.ts` with the app (via `lib/auth/username.ts`). The reserved-name list there must match `public.is_reserved_username()`.
@@ -71,6 +72,7 @@ All of tests, type check and build must be green before you call work done.
 - A failed send must never be retried on a tight timer. The full-scene send on resubscribe covers it.
 - Secrets: never put the Supabase service-role key in Next.js or Vercel env vars, or prefix a secret with `NEXT_PUBLIC_`.
 - UI status copy is fixed in `lib/ui/statusLabels.ts`. Change it there, together with its tests.
+- Styling ("Marker Board") lives in `app/globals.css` tokens. Global rules must not restyle Excalidraw: avoid generic class names it also uses (it has `.empty`), and keep the `.excalidraw h1/h2` reset. Never rotate forms, fields or buttons.
 - Accounts:
   - `authenticated` may update only `profiles.display_name` (a column grant). Usernames change only through the sign-up trigger and `claim_username`. Never re-grant table-wide UPDATE.
   - Email-link pages trust only the session that the link's own token or code created (`finishEmailLink`), never a session that already existed in the browser.
@@ -107,6 +109,10 @@ All of tests, type check and build must be green before you call work done.
 - Public `auth.signUp` returns the profile trigger's raw Postgres error (`username_reserved`, `... profiles_username_key`), not a generic message. Map new trigger errors in `lib/auth/messages.ts`.
 - Auth email uses Supabase's built-in sender: 2 emails per hour, delivered only to project team members. To test sign-in without sending email, create a pre-confirmed user with the admin API (`POST /auth/v1/admin/users`, `email_confirm: true`), then delete it.
 - The Supabase client uses the implicit flow, so email links arrive as `#access_token=...`. auth-js clears the hash while it initializes, so read the URL before calling `getSupabase()`.
+
+- vitest runs in node with no DOM, so components and CSS are verified in a browser. When the Chrome extension is not connected, drive headless Chrome over the DevTools protocol; its `--window-size` never goes below 500px wide, so use `Emulation.setDeviceMetricsOverride` for phone widths.
+- Dashboard filters update the URL with `window.history.replaceState`, not `router.replace`: the router's server round trip let quick successive changes overwrite each other.
+- The Management API `database/query` endpoint returns only the last statement's result; query one thing per call when verifying.
 
 ## Finishing a feature
 
