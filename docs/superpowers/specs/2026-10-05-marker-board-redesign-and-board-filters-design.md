@@ -76,7 +76,7 @@ Rules:
 - Secondary buttons: white fill, ink border, no shadow until hover.
 - Focus: `outline: 3px solid var(--ink)` plus `--accent-soft` ring; never removed.
 - Touch targets are at least 44px tall on every interactive element.
-- Cards may tilt by at most 0.4°. Inputs, buttons and anything tappable inside a form are never rotated, so taps land where they look.
+- Only decorative elements tilt (the live pill, doodles, the empty-state card), by at most 2°. Forms, fields, board cards and buttons are never rotated, so taps land where they look.
 - Hover wiggle and the press shift are disabled under `prefers-reduced-motion: reduce`. The live-dot pulse already is.
 - Ruled-paper ground (`.paper`) replaces the dot grid on landing, auth pages and dashboard. The room page has no paper ground (the canvas fills it).
 
@@ -92,7 +92,7 @@ Rules:
 | `/signup`, `/signin`, `/forgot-password`, `/reset-password` | `AuthCard` becomes an "index card": white, ink border, `--shadow`, uneven corners, Kalam title. Fields use ink borders; errors in `--danger`. |
 | Dashboard | Header with Kalam wordmark, **New board** primary button, `@username` menu as an outlined sticker. "Boards" in Kalam with a mono count. Each board is its own ink-outlined card (gap between cards) with title, mono timestamp, and role/company chips. Empty state: dashed ink border and a small doodle. |
 | Username notice | Index card style, yellow highlighter on "Choose a username". |
-| Room top bar (`StatusBar`) | White bar, 2px ink bottom border, at most 52px tall so the canvas keeps its space. Status, presence and save text in Nunito; warnings in `--warning`. Share is a secondary sticker button. |
+| Room top bar (`StatusBar`) | White bar, 2px ink bottom border, 52px tall on tablet and wider (it may wrap on phones) so the canvas keeps its space. Status, presence and save text in Nunito; warnings in `--warning`. Share is a secondary sticker button. |
 | Share dialog | Index card dialog over a translucent ink backdrop. Viewer link in mono. |
 | Link-error page | Index card centred on ruled paper. |
 
@@ -170,7 +170,8 @@ The dashboard query adds `created_at, role, company`: `select("id,title,role,com
 | Role | Any, or one role key from the loaded boards | `role=<key>` |
 | Company | Any, or one company key from the loaded boards | `company=<key>` |
 
-- Active filters show as yellow-soft pills with an × to remove that one filter. **Clear** removes all filters and keeps the sort.
+- An active filter control turns yellow-soft and shows an × that removes that one filter. **Clear** removes all filters and keeps the sort.
+- Controls are native `<select>` and `<input type="date">`, so tablets get their own pickers.
 - The heading count reads "N of M" when any filter is active, else "M".
 - When filters match nothing: "No boards match these filters." with a **Clear filters** button.
 - Unknown or malformed URL params are ignored (treated as unset), never an error.
