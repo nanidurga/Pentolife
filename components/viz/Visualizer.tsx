@@ -13,8 +13,10 @@ import { joinRoom } from "@/lib/rooms/api";
 import { createJoinRetry, type JoinRetry } from "@/lib/rooms/joinRetry";
 import { ensureAnonymousSession } from "@/lib/supabase";
 import { SYNC_REPLY_MIN_GAP_MS } from "@/lib/sync/messages";
+import { createFlusher } from "@/lib/sync/throttle";
 import { defaultDrafts, readVizBackup, writeVizBackup, type Drafts } from "@/lib/viz/backup";
 import { openVizConnection, type VizConnection } from "@/lib/viz/channel";
+import type { StepPayload } from "@/lib/viz/messages";
 import { VIZ_COPY } from "@/lib/viz/copy";
 import { LIMITS, type Language } from "@/lib/viz/engines";
 import { createRunner, type RunPhase, type Runner } from "@/lib/viz/runner";
@@ -80,9 +82,10 @@ export default function Visualizer({ roomId, role, token, viewerToken, local }: 
   const lastKeystroke = useRef(0);
   const remoteRevs = useRef(new Map<string, number>());
   const driving = useRef(false);
+  // Realtime can deliver a step before the last chunk of its trace; hold it until that trace arrives.
+  const earlyStep = useRef<StepPayload | null>(null);
   const codeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSyncReply = useRef(0);
   const heardRef = useRef(heardEditor);
   heardRef.current = heardEditor;
 
@@ -125,6 +128,16 @@ export default function Visualizer({ roomId, role, token, viewerToken, local }: 
     let joinRetry: JoinRetry | null = null;
     let open: VizConnection | null = null;
     let waitTimer: ReturnType<typeof setTimeout> | null = null;
+    // At most one catch-up reply per gap, but a request inside the gap is answered when it ends, never dropped:
+    // a viewer that reloads quickly would otherwise wait forever.
+    const syncReply = createFlusher({
+      intervalMs: SYNC_REPLY_MIN_GAP_MS,
+      flush: () => {
+        sendCodeNow();
+        const { run: r, step: s, playing: p } = latest.current;
+        if (r) void open?.sendTrace(r.runId, r.trace).then(() => open?.sendStep({ runId: r.runId, step: s, playing: p }));
+      },
+    });
 
     async function start() {
       const supabase = await ensureAnonymousSession().catch(() => null);
@@ -150,27 +163,22 @@ export default function Visualizer({ roomId, role, token, viewerToken, local }: 
               setHeardEditor(true);
               setNoEditor(false);
               driving.current = false;
-              // The matching viz-step can arrive before React re-renders; let onStep see this run now.
-              latest.current = { ...latest.current, run: { runId, trace }, step: 0 };
+              const early = earlyStep.current?.runId === runId ? earlyStep.current : null;
+              earlyStep.current = null;
+              const start = early ? Math.min(early.step, Math.max(0, trace.steps.length - 1)) : 0;
+              // A later viz-step can arrive before React re-renders; let onStep see this run now.
+              latest.current = { ...latest.current, run: { runId, trace }, step: start };
               setRun({ runId, trace });
-              setStep(0);
-              setPlaying(false);
+              setStep(start);
+              setPlaying(early?.playing ?? false);
             },
             onStep: (payload) => {
-              if (latest.current.run?.runId !== payload.runId) return;
+              if (latest.current.run?.runId !== payload.runId) { earlyStep.current = payload; return; }
               driving.current = false;
               setStep(Math.min(payload.step, Math.max(0, latest.current.run.trace.steps.length - 1)));
               setPlaying(payload.playing);
             },
-            onSyncRequest: () => {
-              if (!editor) return;
-              const now = Date.now();
-              if (now - lastSyncReply.current < SYNC_REPLY_MIN_GAP_MS) return;
-              lastSyncReply.current = now;
-              sendCodeNow();
-              const { run: r, step: s, playing: p } = latest.current;
-              if (r) void open?.sendTrace(r.runId, r.trace).then(() => open?.sendStep({ runId: r.runId, step: s, playing: p }));
-            },
+            onSyncRequest: () => { if (editor) syncReply.schedule(); },
             onStatus: setStatus,
             onPresence: setPresence,
             onSubscribed: () => {
@@ -192,6 +200,7 @@ export default function Visualizer({ roomId, role, token, viewerToken, local }: 
       cancelled = true;
       window.removeEventListener("online", onOnline);
       if (waitTimer) clearTimeout(waitTimer);
+      syncReply.cancel();
       joinRetry?.dispose();
       open?.close();
       connection.current = null;
