@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type KeyboardEvent, useId, useMemo, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, useId, useMemo, useRef, useState } from "react";
 import Field, { type FieldMessage } from "@/components/auth/Field";
 import TagInput from "@/components/dashboard/TagInput";
 import type { DashboardBoard } from "@/lib/dashboard/filter";
@@ -27,6 +27,8 @@ export default function BoardDetailsDialog({ mode, initial, boards, onSubmit, on
   const roles = useMemo(() => tagOptions(boards, "role"), [boards]);
   const companies = useMemo(() => tagOptions(boards, "company"), [boards]);
   const creating = mode === "create";
+  // A text selection dragged out of the form ends with a click on the backdrop; that must not close the dialog.
+  const pressedBackdrop = useRef(false);
 
   function dismiss() {
     if (!pending) onClose();
@@ -59,7 +61,16 @@ export default function BoardDetailsDialog({ mode, initial, boards, onSubmit, on
     fieldError?.field === field ? { text: fieldError.message, tone: "danger" } : null;
   const submitLabel = creating ? (pending ? "Creating…" : "Create board") : (pending ? "Saving…" : "Save changes");
 
-  return <div className="dialog-backdrop" onClick={dismiss}>
+  function onBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
+    pressedBackdrop.current = event.target === event.currentTarget;
+  }
+
+  function onBackdropClick(event: MouseEvent<HTMLDivElement>) {
+    if (pressedBackdrop.current && event.target === event.currentTarget) dismiss();
+    pressedBackdrop.current = false;
+  }
+
+  return <div className="dialog-backdrop" onPointerDown={onBackdropPointerDown} onClick={onBackdropClick}>
     <section className="dialog details-dialog" role="dialog" aria-modal="true" aria-labelledby={headingId}
       onClick={(event) => event.stopPropagation()} onKeyDown={onKeyDown}>
       <h2 id={headingId}>{creating ? "New board" : "Edit details"}</h2>

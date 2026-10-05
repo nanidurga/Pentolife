@@ -111,12 +111,12 @@ export default function Dashboard({ username, onProfileChange }: { username: str
       {error && <p className="form-error" role="alert">{error}</p>}
       {boards && boards.length > 0 && !loadFailed && <FilterBar filters={filters} roles={roles} companies={companies} onChange={setFilters} />}
       {boards === null ? <p className="muted">Loading…</p>
-        : boards.length === 0 ? <div className="empty">
+        : boards.length === 0 ? <div className="empty-state">
           <LogoMark size={40} />
           <p className="muted">No boards yet. Create one, then share its link with your interviewer.</p>
           <button className="primary" onClick={() => openDialog({ mode: "create" })} disabled={busy}>New board</button>
         </div>
-        : visible.length === 0 ? <div className="empty">
+        : visible.length === 0 ? <div className="empty-state">
           <p className="muted">No boards match these filters.</p>
           <button className="button" onClick={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort })}>Clear filters</button>
         </div>

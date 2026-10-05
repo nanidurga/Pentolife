@@ -38,7 +38,9 @@ p { margin: 0; }
 button { font: inherit; cursor: pointer; }
 :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 /* Keep Excalidraw exactly as it was before the redesign. */
-.excalidraw h1, .excalidraw h2 { font-family: inherit; line-height: inherit; text-wrap: inherit; }
+.excalidraw h1, .excalidraw h2 { font-family: inherit; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; text-wrap: inherit; }
+.excalidraw h1 { font-size: 26px; }
+.excalidraw h2 { font-size: 17px; }
 .excalidraw :focus-visible { outline: 2px solid #2457e6; outline-offset: 2px; }
 .muted { color: var(--muted); }
 .mono { font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -117,7 +119,7 @@ button { font: inherit; cursor: pointer; }
 .board-row:hover { box-shadow: var(--shadow-sm); transform: translate(-1px, -1px); }
 .board-row strong { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-time { color: var(--muted); flex: none; font-family: var(--font-mono), ui-monospace, monospace; font-size: 12.5px; white-space: nowrap; }
-.empty { background: var(--surface); border: var(--border-w) dashed var(--ink); border-radius: var(--radius-card); display: grid; gap: 14px; justify-items: start; padding: 32px 24px; transform: rotate(-.4deg); }
+.empty-state { background: var(--surface); border: var(--border-w) dashed var(--ink); border-radius: var(--radius-card); display: grid; gap: 14px; justify-items: start; padding: 32px 24px; transform: rotate(-.4deg); }
 .notice { background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius-card); box-shadow: var(--shadow); display: grid; gap: 4px; padding: 22px; }
 .notice .auth-form { margin-top: 12px; max-width: 360px; }
 
@@ -145,6 +147,8 @@ button { font: inherit; cursor: pointer; }
 
 /* Board details dialog and tag autocomplete */
 .details-dialog { overflow: visible; width: min(540px, 100%); }
+/* On short screens (a phone in landscape) the dialog must scroll so Save stays reachable. */
+@media (max-height: 560px) { .details-dialog { overflow: auto; } }
 .details-form { display: grid; gap: 16px; }
 .details-tags { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
