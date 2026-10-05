@@ -143,7 +143,20 @@ button { font: inherit; cursor: pointer; }
 .link-error { display: grid; min-height: 100vh; padding: 24px 16px; place-items: center; }
 .link-error .auth-card { gap: 14px; justify-items: start; }
 
+/* Board details dialog and tag autocomplete */
+.details-dialog { overflow: visible; width: min(540px, 100%); }
+.details-form { display: grid; gap: 16px; }
+.details-tags { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.tag-input { position: relative; }
+.suggest { background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-sm); left: 0; list-style: none; margin: 0; padding: 4px; position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; }
+.suggest li { align-items: center; border-radius: 6px; cursor: pointer; display: flex; font-size: 14px; font-weight: 600; gap: 8px; justify-content: space-between; min-height: var(--tap); padding: 0 10px; }
+.suggest li:hover, .suggest li.active { background: var(--accent-soft); }
+.suggest span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest em { color: var(--muted); flex: none; font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; font-style: normal; }
+
 @media (max-width: 640px) {
+  .details-tags { grid-template-columns: minmax(0, 1fr); }
   .topbar { gap: 10px; padding: 4px 10px; }
   .brand-name { display: none; }
   .app-header { gap: 8px; padding: 8px 12px; }
