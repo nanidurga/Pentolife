@@ -54,7 +54,7 @@ export default function Dashboard({ username, onProfileChange }: { username: str
     </header>
     <main className="dashboard">
       {username === null && <ClaimUsername onClaimed={onProfileChange} />}
-      <div className="section-head"><h1>Boards</h1>{boards && boards.length > 0 && <span className="muted">{boards.length}</span>}</div>
+      <div className="section-head"><h1>Boards</h1>{boards && boards.length > 0 && <span className="count">{boards.length}</span>}</div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {boards === null ? <p className="muted">Loading…</p>
         : boards.length === 0 ? <div className="empty">
@@ -64,7 +64,7 @@ export default function Dashboard({ username, onProfileChange }: { username: str
         </div>
         : <ul className="board-list">{boards.map((board) => <li key={board.id}>
           <button className="board-row" onClick={() => enter({ action: "owner-access", roomId: board.id })} disabled={busy}>
-            <strong>{board.title}</strong><span>Edited {relativeTime(new Date(board.updated_at), now)}</span>
+            <strong>{board.title}</strong><span className="board-time">Edited {relativeTime(new Date(board.updated_at), now)}</span>
           </button>
         </li>)}</ul>}
     </main>
@@ -90,7 +90,7 @@ function ClaimUsername({ onClaimed }: { onClaimed: () => void }) {
   }
 
   return <section className="notice">
-    <h2>Choose a username</h2>
+    <h2>Choose a <span className="highlight">username</span></h2>
     <p className="muted">You can sign in with it instead of your email.</p>
     <form className="auth-form" onSubmit={submit}>
       <UsernameField value={value} onChange={setValue} onStatus={setStatus} />

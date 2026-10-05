@@ -7,7 +7,7 @@ export function LogoMark({ size = 26, className }: { size?: number; className?: 
       <rect width="11" height="11" rx="2.5" />
       <rect x="13" width="11" height="11" rx="2.5" />
       <rect y="13" width="11" height="11" rx="2.5" />
-      <rect x="13" y="13" width="11" height="11" rx="2.5" style={{ fill: "var(--accent)" }} />
+      <rect x="13" y="13" width="11" height="11" rx="2.5" stroke="currentColor" strokeWidth="2" style={{ fill: "var(--accent)" }} />
       <rect y="26" width="11" height="11" rx="2.5" />
     </g>
   </svg>;

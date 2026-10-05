@@ -146,6 +146,8 @@ button { font: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .topbar { gap: 10px; padding: 4px 10px; }
   .brand-name { display: none; }
+  .app-header { gap: 8px; padding: 8px 12px; }
+  .app-header .logo span { display: none; }
   .doodle { display: none; }
   .landing { padding: 16px 16px 40px; }
   .auth-card { padding: 24px 20px; }
