@@ -155,7 +155,31 @@ button { font: inherit; cursor: pointer; }
 .suggest span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggest em { color: var(--muted); flex: none; font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; font-style: normal; }
 
+/* Board cards, chips and filters */
+.board-card { position: relative; }
+.board-card .board-row { padding-right: 68px; }
+.board-main { display: grid; gap: 8px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--mint-bg); border-radius: 999px; color: var(--mint-fg); font-size: 12.5px; font-weight: 700; padding: 3px 10px; }
+.chip.company { background: var(--lilac-bg); color: var(--lilac-fg); }
+.board-menu { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+/* An open menu must sit above the next card, which otherwise paints over its panel. */
+.board-menu[open] { z-index: 20; }
+.icon-button { align-items: center; background: var(--surface); border: var(--border-w) solid transparent; border-radius: var(--radius); cursor: pointer; display: inline-flex; font-size: 20px; font-weight: 800; height: var(--tap); justify-content: center; width: var(--tap); }
+.icon-button:hover, .menu[open] > .icon-button { border-color: var(--ink); }
+.filter-bar { align-items: end; display: flex; flex-wrap: wrap; gap: 10px 12px; }
+.filter { color: var(--muted); display: grid; font-size: 12.5px; font-weight: 700; gap: 4px; }
+.filter-control { align-items: center; display: flex; gap: 2px; }
+.filter select, .filter input { background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; max-width: 220px; min-height: var(--tap); padding: 0 10px; }
+.filter.on select, .filter.on input { background: var(--accent-soft); }
+.filter-remove { background: none; border: 0; border-radius: var(--radius); color: var(--ink); font-size: 20px; font-weight: 800; height: var(--tap); width: 36px; }
+.filter-remove:hover { background: var(--accent-soft); }
+.clear-filters { background: none; border: 0; color: var(--ink); font-weight: 700; min-height: var(--tap); padding: 0 8px; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 3px; text-underline-offset: 3px; }
+
 @media (max-width: 640px) {
+  .board-menu { top: 10px; transform: none; }
+  .filter { flex: 1 1 140px; }
+  .filter select, .filter input { max-width: none; width: 100%; }
   .details-tags { grid-template-columns: minmax(0, 1fr); }
   .topbar { gap: 10px; padding: 4px 10px; }
   .brand-name { display: none; }

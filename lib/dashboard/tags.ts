@@ -44,3 +44,9 @@ export function suggest(options: TagOption[], typed: string, limit = 6): Suggest
   if (key && !options.some((option) => option.key === key)) items.push({ kind: "new", label: cleanText(typed) });
   return items;
 }
+
+// The list opens only when something matches: a lone "Use …" row would just cover the dialog's buttons.
+export function listSuggestions(options: TagOption[], typed: string, limit = 6): Suggestion[] {
+  const items = suggest(options, typed, limit);
+  return items.some((item) => item.kind === "existing") ? items : [];
+}

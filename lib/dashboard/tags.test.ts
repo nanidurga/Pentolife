@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suggest, tagKey, tagOptions } from "@/lib/dashboard/tags";
+import { listSuggestions, suggest, tagKey, tagOptions } from "@/lib/dashboard/tags";
 
 const board = (role: string | null, company: string | null, created_at: string) => ({ role, company, created_at });
 
@@ -70,5 +70,18 @@ describe("suggest", () => {
     const result = suggest(many, "team");
     expect(result.filter((item) => item.kind === "existing")).toHaveLength(6);
     expect(result.at(-1)).toEqual({ kind: "new", label: "team" });
+  });
+});
+
+describe("listSuggestions", () => {
+  const options = [{ key: "razorpay", label: "Razorpay", count: 6 }];
+
+  it("shows nothing when the only row would repeat what was typed", () => {
+    expect(listSuggestions(options, "zepto")).toEqual([]);
+    expect(listSuggestions([], "anything")).toEqual([]);
+  });
+
+  it("shows matches, with the new row, when something matches", () => {
+    expect(listSuggestions(options, "ra")).toEqual(suggest(options, "ra"));
   });
 });

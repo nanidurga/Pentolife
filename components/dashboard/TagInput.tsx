@@ -2,7 +2,7 @@
 
 import { type KeyboardEvent, useId, useState } from "react";
 import type { FieldMessage } from "@/components/auth/Field";
-import { suggest, type Suggestion, type TagOption } from "@/lib/dashboard/tags";
+import { listSuggestions, type Suggestion, type TagOption } from "@/lib/dashboard/tags";
 
 type TagInputProps = {
   label: string;
@@ -20,7 +20,7 @@ export default function TagInput({ label, value, onChange, options, placeholder,
   const messageId = `${id}-message`;
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const items = open ? suggest(options, value) : [];
+  const items = open ? listSuggestions(options, value) : [];
   const showList = items.length > 0;
   const optionId = (index: number) => `${id}-option-${index}`;
 
