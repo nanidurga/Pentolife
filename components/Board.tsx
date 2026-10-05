@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import ShareDialog from "@/components/ShareDialog";
 import StatusBar from "@/components/StatusBar";
-import { localRoomKey, makeCapability } from "@/lib/room";
+import { localRoomKey, makeCapability, roomQuery } from "@/lib/room";
 import { joinRoom, saveSnapshot, type Scene } from "@/lib/rooms/api";
 import { createJoinRetry, type JoinRetry } from "@/lib/rooms/joinRetry";
 import type { PresenceCounts } from "@/lib/realtime/presence";
@@ -310,7 +310,8 @@ export default function Board({ roomId, role, token, viewerToken, local }: Board
   }
 
   return <main className="room">
-    <StatusBar role={role} status={status} presence={presence} saveState={saveState} onShare={role === "editor" ? openShare : undefined} />
+    <StatusBar role={role} status={status} presence={presence} saveState={saveState} onShare={role === "editor" ? openShare : undefined}
+      views={{ roomId, query: roomQuery({ role, token, viewerToken, local }), current: "board" }} />
     <section className="canvas">
       {!ready && <div className="loading">Opening board…</div>}
       <Excalidraw

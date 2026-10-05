@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:workers": "node scripts/build-viz-workers.mjs",
+    "predev": "npm run build:workers",
     "dev": "next dev",
+    "prebuild": "npm run build:workers",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -30,6 +33,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@yowasp/clang": "22.0.0-git20542-10",
+    "esbuild": "^0.28.2",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "pyodide": "314.0.7",

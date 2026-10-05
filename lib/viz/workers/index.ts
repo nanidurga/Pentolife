@@ -1,4 +1,5 @@
 import type { WorkerLike } from "@/lib/viz/runner";
 
-export const pythonWorker = () => new Worker(new URL("./python.worker.ts", import.meta.url), { type: "module" }) as unknown as WorkerLike;
-export const cppWorker = () => new Worker(new URL("./cpp.worker.ts", import.meta.url), { type: "module" }) as unknown as WorkerLike;
+// Built by scripts/build-viz-workers.mjs (runs before `next dev` and `next build`).
+export const pythonWorker = () => new Worker("/viz/python.worker.js", { type: "module" }) as unknown as WorkerLike;
+export const cppWorker = () => new Worker("/viz/cpp.worker.js", { type: "module" }) as unknown as WorkerLike;

@@ -11,12 +11,17 @@ type StatusBarProps = {
   presence: PresenceCounts;
   saveState: SaveState | null;
   onShare?: () => void;
+  views?: { roomId: string; query: string; current: "board" | "viz" };
 };
 
-export default function StatusBar({ role, status, presence, saveState, onShare }: StatusBarProps) {
+export default function StatusBar({ role, status, presence, saveState, onShare, views }: StatusBarProps) {
   const warn = status === "offline" || status === "reconnecting";
   return <header className="topbar">
     <Link href="/" className="brand" aria-label="Back to your boards" title="Back to your boards"><LogoMark size={20} /><span className="brand-name">PentoLive</span></Link>
+    {views && <nav className="view-switch" aria-label="Switch view">
+      <Link className={views.current === "board" ? "on" : undefined} aria-current={views.current === "board" ? "page" : undefined} href={`/room/${views.roomId}?${views.query}`}>Board</Link>
+      <Link className={views.current === "viz" ? "on" : undefined} aria-current={views.current === "viz" ? "page" : undefined} href={`/room/${views.roomId}/visualize?${views.query}`}>Visualizer</Link>
+    </nav>}
     <span className={`status ${warn ? "offline" : ""}`} role="status">{status === "live" && <span className="live-dot pulse" />}{connectionLabel(status)}</span>
     {status !== "local" && <span className="presence">{presenceLabel(role, presence)}</span>}
     {saveState && <span className={`save ${saveState === "retrying" || saveState === "failed" || saveState === "replaced" ? "warn" : ""}`}>{saveLabel(saveState)}</span>}
